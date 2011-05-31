@@ -1,6 +1,6 @@
 # DataSift consumer for NodeJS
 
-This library gives simple access to real-time data coming from a DataSift stream with
+This library gives easy access to the real-time data coming from one or more DataSift streams.
 
 It connects to the DataSift streaming API, and emits all data received. It can also handle multiple stream simultaneously.
 
