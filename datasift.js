@@ -128,12 +128,11 @@ DataSift.prototype.connect = function() {
 DataSift.prototype.disconnect = function(forced) {
 	if (forced) {
 		//Reset request and response
-		this.request = null;
-		this.response = null;
 		this.emit('disconnect');
-	} else {
-		//User chose to disconnect
 	}
+	
+	this.request = null;
+	this.response = null;
 };
 
 
