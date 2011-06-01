@@ -28,13 +28,6 @@ function DataSift(username, apiKey) {
 	//The port
 	this.port = 8082;
 	
-	//Callback for connection
-	if (callback instanceof Function) {
-		this.connectCallback = callback;
-	} else {
-		this.connectCallback = null;
-	}
-	
 	//The request object
 	this.request = null;
 	
@@ -88,11 +81,6 @@ DataSift.prototype.connect = function() {
 		
 		//Clear the request timeout
 		clearTimeout(connectTimeout);
-		
-		//Run the connection callback
-		if (self.connectionCallback instanceof Function) {
-			callback();
-		}
 		
 		//Emit a connected event
 		self.emit('connect');
