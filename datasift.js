@@ -58,9 +58,9 @@ DataSift.prototype.connect = function() {
 	
 	//Create the headers
 	var headers = {
-		'User-Agent'		: this.userAgent,
-		'Host'				: this.host,
-		'Connection'		: 'Keep-Alive',
+		'User-Agent'        : this.userAgent,
+		'Host'              : this.host,
+		'Connection'        : 'Keep-Alive',
 		'Transfer-Encoding' : 'chunked',
 		'Authorization'     : this.username + ':' + this.apiKey
 	};
