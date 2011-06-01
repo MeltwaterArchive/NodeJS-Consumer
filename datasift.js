@@ -7,11 +7,10 @@ var events = require('events');
  *
  * @param string   username
  * @param string   API key
- * @param Function the connection callback
  * 
  * @return void
  */
-function DataSift(username, apiKey, callback) {
+function DataSift(username, apiKey) {
 	events.EventEmitter.call(this);
 	
 	//The username
