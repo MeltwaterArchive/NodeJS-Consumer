@@ -3,7 +3,7 @@ var util = require('util');
 var events = require('events');
 
 /** 
- * Creates Client instance
+ * Creates DataSift instance
  *
  * @param string   username
  * @param string   API key
