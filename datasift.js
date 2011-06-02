@@ -12,6 +12,7 @@ var events = require('events');
  */
 function DataSift(username, apiKey) {
 	events.EventEmitter.call(this);
+	var self = this;
 	
 	//The username
 	this.username = username;
@@ -23,10 +24,10 @@ function DataSift(username, apiKey) {
 	this.userAgent = 'DataSiftNodeConsumer/1.0';
 	
 	//The host
-	this.host = 'ollie0';
+	this.host = 'stream.echodatasift.net';
 	
 	//The port
-	this.port = 8082;
+	this.port = 80;
 	
 	//The request object
 	this.request = null;
@@ -36,6 +37,11 @@ function DataSift(username, apiKey) {
 	
 	//Go ahead and connect to DataSift
 	this.connect();
+
+	//Add a listener for processing closing
+	process.on('exit', function () {
+		self.disconnect();
+	});
 	
 }
 util.inherits(DataSift, events.EventEmitter);
@@ -66,8 +72,8 @@ DataSift.prototype.connect = function() {
 
 	//Add a connection timeout
 	var connectTimeout = setTimeout(function() {
-		self.emit('error', new Error('Error connecting to DataSift: Timed out waiting for a response'));
 		self.request.abort();
+		self.emit('error', new Error('Error connecting to DataSift: Timed out waiting for a response'));
 	}, 10000);
 
 	//Check for an error
@@ -76,7 +82,7 @@ DataSift.prototype.connect = function() {
 	});
 
 	//Add a listener for the response
-	self.request.on('response', function(response) {
+	self.request.on('response', function(response) {		
 		self.response = response;
 		
 		//Clear the request timeout
