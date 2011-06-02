@@ -10,7 +10,7 @@ var events = require('events');
  * 
  * @return void
  */
-function DataSift(username, apiKey) {
+function DataSift(username, apiKey, host, port) {
 	events.EventEmitter.call(this);
 	var self = this;
 	
@@ -24,10 +24,18 @@ function DataSift(username, apiKey) {
 	this.userAgent = 'DataSiftNodeConsumer/1.0';
 	
 	//The host
-	this.host = 'stream.echodatasift.net';
+	if (host !== undefined) {
+		this.host = host;
+	} else {
+		this.host = 'stream.datasift.net';
+	}
 	
 	//The port
-	this.port = 80;
+	if (port !== undefined) {
+		this.port = port;
+	} else {
+		this.port = 80;
+	}
 	
 	//The request object
 	this.request = null;
