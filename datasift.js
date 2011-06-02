@@ -153,7 +153,7 @@ DataSift.prototype.subscribe = function(hash) {
 		this.emit('error', new Error('Invalid hash given: ' + hash));
 	} else {
 		//Send json message to DataSift to subscribe
-		var json = {"action":"subscribe", "definitionId":hash};
+		var json = {"action":"subscribe", "hash":hash};
 		this.request.write(JSON.stringify(json), 'utf8');
 	}
 };
@@ -174,7 +174,7 @@ DataSift.prototype.unsubscribe = function(hash) {
 		this.emit('error', new Error('Invalid hash given: ' + hash));
 	} else {
 		//Send json message to DataSift to subscribe
-		var json = {"action":"unsubscribe", "definitionId":hash};
+		var json = {"action":"unsubscribe", "hash":hash};
 		this.request.write(JSON.stringify(json), 'utf8');
 	}
 };
