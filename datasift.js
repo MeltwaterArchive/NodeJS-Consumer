@@ -192,8 +192,13 @@ DataSift.prototype.receivedData = function(json) {
 	if (json.status == "failure") {
 		this.emit('error', new Error(json.message));
 		this.disconnect(true);
+	
+	} else if (json.status == "warning") {
+		this.emit('warning', json.message);
+	
 	} else {
 		this.emit('interaction', json);
+	
 	}
 	
 };

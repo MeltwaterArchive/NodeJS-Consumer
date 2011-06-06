@@ -16,6 +16,11 @@ consumer.on("error", function(error){
 	console.log("Error: " + error.message);
 });
 
+//Emitted when there is a warning
+consumer.on("warning", function(message){
+	console.log("Warning: " + message);
+});
+
 //Emitted when disconnected
 consumer.on("disconnect", function(){
 	console.log("Disconnected!");
