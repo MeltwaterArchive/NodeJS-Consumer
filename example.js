@@ -4,6 +4,9 @@ var DataSift = require('./datasift.js');
 //Create a new instance of the DataSift consumer
 var consumer = new DataSift('username', 'api_key');
 
+//Connect
+consumer.connect();
+
 //Emitted when stream is connected
 consumer.on("connect", function(){
 	console.log("Connected!");
