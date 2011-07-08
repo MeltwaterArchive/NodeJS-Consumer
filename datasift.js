@@ -21,7 +21,7 @@ function DataSift(username, apiKey, host, port) {
 	this.apiKey = apiKey;
 
 	//The user agent
-	this.userAgent = 'DataSiftNodeConsumer/1.0';
+	this.userAgent = 'DataSiftNodeConsumer/0.1';
 	
 	//The host
 	if (host !== undefined) {
@@ -43,13 +43,64 @@ function DataSift(username, apiKey, host, port) {
 	//The response object
 	this.response = null;
 	
-	//Go ahead and connect to DataSift
-	this.connect();
+	//Last connect
+	this.lastConnect = null;
 
 	//Add a listener for processing closing
 	process.on('exit', function () {
 		self.disconnect();
 	});
+	
+	//Connect timeout
+	this.connectTimeout = null;
+	
+	//Error callback
+	this.errorCallback = function(err, emitDisconnect) {
+		if (emitDisconnect === undefined) {
+			emitDisconnect = false;
+		}
+		self.emit('error', err);
+		self.disconnect(emitDisconnect);
+	}
+	
+	//Disconnection callback
+	this.disconnectCallback = function() {
+		//Handle disconnection
+		self.disconnect(true);
+	}
+	
+	//Data callback
+	this.dataCallback = function(chunk) {
+		//Split by line space and look for json start
+		var data = chunk.toString('utf8').split("\n");
+		data.forEach(function(key, i){
+			if ( data[i].length >= 50 ) {
+				try { self.receivedData(JSON.parse(data[i]));} catch (e) {}
+			}
+		});
+	}
+	
+	//Response callback
+	this.responseCallback = function(response) {		
+		self.response = response;
+		
+		//Set the last successful connect
+		self.lastConnect = new Date().getTime();
+		
+		//Clear the request timeout
+		if (self.connectTimeout != null) {
+			clearTimeout(self.connectTimeout);
+		}
+
+		//Emit a connected event
+		self.emit('connect');
+
+		//Disconnection
+		response.connection.on('end', self.disconnectCallback);
+		
+		//When we receive data do something with it
+		response.on('data', self.dataCallback);
+	};
 	
 }
 util.inherits(DataSift, events.EventEmitter);
@@ -63,60 +114,47 @@ util.inherits(DataSift, events.EventEmitter);
 DataSift.prototype.connect = function() {
 	var self = this;
 	
-	//Create the headers
-	var headers = {
-		'User-Agent'        : this.userAgent,
-		'Host'              : this.host,
-		'Connection'        : 'Keep-Alive',
-		'Transfer-Encoding' : 'chunked',
-		'Authorization'     : this.username + ':' + this.apiKey
-	};
-
-	//Create an http client
-	var client = http.createClient(this.port, this.host);
-
-	//Make the request
-	self.request = client.request("GET", '/', headers);
-
-	//Add a connection timeout
-	var connectTimeout = setTimeout(function() {
-		self.request.abort();
-		self.emit('error', new Error('Error connecting to DataSift: Timed out waiting for a response'));
-	}, 10000);
-
-	//Check for an error
-	self.request.on('error', function(err) {
-		self.emit('error', new Error('Error connecting to DataSift: ' + e.message));
-	});
-
-	//Add a listener for the response
-	self.request.on('response', function(response) {		
-		self.response = response;
+	//Connect if we are allowed
+	if (this.lastConnect == null || this.lastConnect < new Date().getTime() - 1500) {
 		
-		//Clear the request timeout
-		clearTimeout(connectTimeout);
-		
-		//Emit a connected event
-		self.emit('connect');
+		//Create the headers
+		var headers = {
+			'User-Agent'        : this.userAgent,
+			'Host'              : this.host,
+			'Connection'        : 'Keep-Alive',
+			'Transfer-Encoding' : 'chunked',
+			'Authorization'     : this.username + ':' + this.apiKey
+		};
 
-		//Disconnection
-		self.response.connection.on('end', function(a) {
-			//Handle disconnection
-			self.disconnect(true);
-		});
+		//Create an http client
+		var client = http.createClient(this.port, this.host);
 
-		//When we receive data do something with it
-		self.response.on('data', function(chunk) {
-			//Split by line space and look for json start
-			var data = chunk.toString('utf8').split("\n");
-			for(var i=0; i<data.length; i++ ) {
-				if ( data[i].length >= 50 ) {
-					try { self.receivedData(JSON.parse(data[i]));} catch (e) {}
-				}
+		//Make the request
+		this.request = client.request("GET", '/', headers);
+
+		//Add a connection timeout
+		this.connectTimeout = setTimeout(function() {
+			if (self.request != null) {
+				self.request.abort();
+				self.errorCallback(new Error('Error connecting to DataSift: Timed out waiting for a response'));
+				self.disconnect();
 			}
-		});
-	});
-	self.request.write("\n", 'utf8');
+			clearTimeout(self.connectTimeout);
+			self.connectTimeout = null;
+		}, 5000);
+
+		//Check for an error
+		this.request.on('error', this.errorCallback);
+
+		//Add a listener for the response
+		this.request.on('response', this.responseCallback);
+		this.request.write("\n", 'utf8');
+	
+	} else {
+		//Not allowed to reconnect so emit error
+		this.errorCallback(new Error('You cannot reconnect too soon after a disconnection'), true);
+	}
+	
 };
 
 
@@ -133,6 +171,17 @@ DataSift.prototype.disconnect = function(forced) {
 		this.emit('disconnect');
 	}
 	
+	//Remove listeners
+	if (this.request != null) {
+		this.request.removeListener('error', this.errorCallback);
+		this.request.removeListener('response', this.responseCallback);
+	}
+	if (this.response != null) {
+		this.response.connection.removeListener('end', this.disconnectCallback);
+		this.response.removeListener('data', this.dataCallback);
+	}
+	
+	//Clear the request and response objects
 	this.request = null;
 	this.response = null;
 };
@@ -154,7 +203,11 @@ DataSift.prototype.subscribe = function(hash) {
 	} else {
 		//Send json message to DataSift to subscribe
 		var json = {"action":"subscribe", "hash":hash};
-		this.request.write(JSON.stringify(json), 'utf8');
+		if (this.request != null) {
+			this.request.write(JSON.stringify(json), 'utf8');
+		} else {
+			this.errorCallback(new Error('You cannot subscribe without being connected to DataSift'));
+		}
 	}
 };
 
@@ -175,7 +228,11 @@ DataSift.prototype.unsubscribe = function(hash) {
 	} else {
 		//Send json message to DataSift to subscribe
 		var json = {"action":"unsubscribe", "hash":hash};
-		this.request.write(JSON.stringify(json), 'utf8');
+		if (this.request != null) {
+			this.request.write(JSON.stringify(json), 'utf8');
+		} else {
+			this.errorCallback('error', new Error('You cannot subscribe without being connected to DataSift'));
+		}
 	}
 };
 
@@ -190,7 +247,7 @@ DataSift.prototype.unsubscribe = function(hash) {
 DataSift.prototype.receivedData = function(json) {
 	//Check to see if its an error
 	if (json.status == "failure") {
-		this.emit('error', new Error(json.message));
+		this.errorCallback(new Error(json.message));
 		this.disconnect(true);
 	
 	} else if (json.status == "warning") {
