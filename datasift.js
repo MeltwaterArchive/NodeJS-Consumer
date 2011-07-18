@@ -128,9 +128,14 @@ DataSift.prototype.connect = function() {
 
 		//Create an http client
 		var client = http.createClient(this.port, this.host);
-
+		
 		//Make the request
 		this.request = client.request("GET", '/', headers);
+
+		//Check for an error on connection
+		client.on('error', function(){
+			self.errorCallback(new Error('Error connecting to DataSift: Could not reach DataSift. Check your internet connection.'));
+		});
 
 		//Add a connection timeout
 		this.connectTimeout = setTimeout(function() {
