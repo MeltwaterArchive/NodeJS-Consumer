@@ -45,6 +45,9 @@ function DataSift(username, apiKey, host, port) {
 	
 	//Last connect
 	this.lastConnect = null;
+	
+	//Data
+	this.data = '';
 
 	//Add a listener for processing closing
 	process.on('exit', function () {
@@ -71,13 +74,32 @@ function DataSift(username, apiKey, host, port) {
 	
 	//Data callback
 	this.dataCallback = function(chunk) {
-		//Split by line space and look for json start
-		var data = chunk.toString('utf8').split("\n");
-		data.forEach(function(key, i){
-			if ( data[i].length >= 50 ) {
-				try { self.receivedData(JSON.parse(data[i]));} catch (e) {}
+		
+		//Convert to utf8 from buffer
+		chunk = chunk.toString('utf8');
+		
+		//console.log("CHUNK: " + chunk);
+		
+		//Add chunk to data
+		self.data += chunk;
+		
+		//If the string contains a line break we will have JSON to process
+		if (chunk.indexOf("\n") > 0) {
+			//Split by line space and look for json start
+			var data = self.data.split("\n");
+			if (data[0] !== undefined) {
+				var json = null;
+				try {json = JSON.parse(data[0])} catch (e) {}
+				if (json != null) {
+					self.receivedData(json);
+				}
 			}
-		});
+			
+			//Add the second half of the chunk to a new piece of data
+			self.data = data[1];
+			
+		}
+		
 	}
 	
 	//Response callback
