@@ -21,13 +21,13 @@ function DataSift(username, apiKey, host, port) {
 	this.apiKey = apiKey;
 
 	//The user agent
-	this.userAgent = 'DataSiftNodeConsumer/0.1';
+	this.userAgent = 'DataSiftNodeConsumer/0.1.1';
 	
 	//The host
 	if (host !== undefined) {
 		this.host = host;
 	} else {
-		this.host = 'stream.datasift.net';
+		this.host = 'stream.datasift.com';
 	}
 	
 	//The port
@@ -77,8 +77,6 @@ function DataSift(username, apiKey, host, port) {
 		
 		//Convert to utf8 from buffer
 		chunk = chunk.toString('utf8');
-		
-		//console.log("CHUNK: " + chunk);
 		
 		//Add chunk to data
 		self.data += chunk;
