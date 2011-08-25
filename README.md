@@ -5,8 +5,8 @@ This library gives easy access to the real-time data coming from one or more Dat
 It connects to the DataSift streaming API, and emits all data received. It can also handle multiple stream simultaneously.
 
 ## Prerequesites
-- You have some experience of Node
-- You have a DataSift account (username and API key) available from http://datasift.net
+- You have some experience of NodeJS
+- You have a DataSift account (username and API key) available from http://datasift.com
 
 ## Use
 - See the example.js script for how to use the library
