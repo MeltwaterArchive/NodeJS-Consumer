@@ -1,5 +1,6 @@
 //Include the DataSift consumer
-var DataSift = require('./datasift.js');
+//var DataSift = require('/path/to/datasift.js');	//When downloading datasift.js
+var DataSift = requre('datasift');					//When using npm installation
 
 //Create a new instance of the DataSift consumer
 var consumer = new DataSift('username', 'api_key');
