@@ -229,7 +229,7 @@ DataSift.prototype.subscribe = function(hash) {
 		//Send json message to DataSift to subscribe
 		var json = {"action":"subscribe", "hash":hash};
 		if (this.request != null) {
-			this.request.write(JSON.stringify(json), 'utf8');
+			this.request.write(JSON.stringify(json) + "\r\n", 'utf8');
 		} else {
 			this.errorCallback(new Error('You cannot subscribe without being connected to DataSift'));
 		}
