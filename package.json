@@ -1,13 +1,13 @@
 {
     "name": "datasift",
-    "version": "0.1.2",
+    "version": "0.1.3",
     "description": "DataSift streaming API consumer",
     "main": "datasift.js",
     "keywords": [
         "datasift",
         "twitter",
-	"facebook",
-	"streaming"
+        "facebook",
+        "streaming"
     ],
     "repository": {
         "type": "git",
