@@ -34,3 +34,8 @@ consumer.on("disconnect", function(){
 consumer.on("interaction", function(data){
 	console.log("Received data: " + JSON.stringify(data));
 });
+
+//Emitted when a delete message is received
+consumer.on("delete", function(data){
+	console.log("Delete: " + JSON.stringify(data));
+});

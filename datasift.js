@@ -270,14 +270,24 @@ DataSift.prototype.unsubscribe = function(hash) {
  * @return void
  */
 DataSift.prototype.receivedData = function(json) {
-	//Check to see if its an error
+	//Check for errors
 	if (json.status == "failure") {
 		this.errorCallback(new Error(json.message));
 		this.disconnect(true);
 	
+	//Check for warnings
 	} else if (json.status == "warning") {
 		this.emit('warning', json.message);
 	
+	//Check for deletes
+	} else if (json.data !== undefined && json.data.deleted === true) {
+		this.emit('delete', json);
+	
+	//Check for ticks
+	} else if (json.tick !== undefined) {
+		this.emit('tick', json);
+		
+	//Normal interaction
 	} else {
 		this.emit('interaction', json);
 	
