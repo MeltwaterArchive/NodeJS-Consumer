@@ -21,7 +21,7 @@ function DataSift(username, apiKey, host, port) {
 	this.apiKey = apiKey;
 
 	//The user agent
-	this.userAgent = 'DataSiftNodeConsumer/0.1.2';
+	this.userAgent = 'DataSiftNodeConsumer/0.1.3';
 	
 	//The host
 	if (host !== undefined) {
