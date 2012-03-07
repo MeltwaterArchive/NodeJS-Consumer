@@ -21,7 +21,7 @@ function DataSift(username, apiKey, host, port) {
 	this.apiKey = apiKey;
 
 	//The user agent
-	this.userAgent = 'DataSiftNodeConsumer/0.1.3';
+	this.userAgent = 'DataSiftNodeConsumer/0.1.4';
 	
 	//The host
 	if (host !== undefined) {
@@ -214,25 +214,30 @@ DataSift.prototype.disconnect = function(forced) {
 
 /**
  * Subscribe to a hash
+ * 
+ * @return void
+ */
+DataSift.prototype.stop = function() {
+	//Send json message to DataSift to subscribe
+	this.send(JSON.stringify({"action":"stop"}));
+};
+
+
+/**
+ * Subscribe to a hash
  *
  * @param string hash the stream hash
  * 
  * @return void
  */
 DataSift.prototype.subscribe = function(hash) {
-	
 	//Check the hash
 	if (!this.checkHash(hash)) {
 		//Send error
 		this.emit('error', new Error('Invalid hash given: ' + hash));
 	} else {
 		//Send json message to DataSift to subscribe
-		var json = {"action":"subscribe", "hash":hash};
-		if (this.request != null) {
-			this.request.write(JSON.stringify(json) + "\r\n", 'utf8');
-		} else {
-			this.errorCallback(new Error('You cannot subscribe without being connected to DataSift'));
-		}
+		this.send(JSON.stringify({"action":"subscribe", "hash":hash}));
 	}
 };
 
@@ -245,19 +250,29 @@ DataSift.prototype.subscribe = function(hash) {
  * @return void
  */
 DataSift.prototype.unsubscribe = function(hash) {
-	
 	//Check the hash
 	if (!this.checkHash(hash)) {
 		//Send error
 		this.emit('error', new Error('Invalid hash given: ' + hash));
 	} else {
-		//Send json message to DataSift to subscribe
-		var json = {"action":"unsubscribe", "hash":hash};
-		if (this.request != null) {
-			this.request.write(JSON.stringify(json), 'utf8');
-		} else {
-			this.errorCallback('error', new Error('You cannot subscribe without being connected to DataSift'));
-		}
+		//Send json message to DataSift to unsubscribe
+		this.send(JSON.stringify({"action":"unsubscribe", "hash":hash}));
+	}
+};
+
+
+/**
+ * Unsubscribe from a hash
+ *
+ * @param string hash the stream hash
+ * 
+ * @return void
+ */
+DataSift.prototype.send = function(message) {
+	if (this.request != null) {
+		this.request.write(message, 'utf8');
+	} else {
+		this.emit('error', new Error('You cannot subscribe/unsubscribe without being connected to DataSift'));
 	}
 };
 
