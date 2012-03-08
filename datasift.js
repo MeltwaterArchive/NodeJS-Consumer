@@ -267,7 +267,7 @@ DataSift.prototype.send = function(message) {
 	if (this.request != null) {
 		this.request.write(message, 'utf8');
 	} else {
-		this.emit('error', new Error('You cannot subscribe/unsubscribe without being connected to DataSift'));
+		this.emit('error', new Error('You cannot send actions without being connected to DataSift'));
 	}
 };
 
