@@ -48,6 +48,11 @@ function DataSift(username, apiKey, host, port) {
 	
 	//Data
 	this.data = '';
+
+	//Add a listener for processing closing
+	process.on('exit', function () {
+		self.disconnect();
+	});
 	
 	//Connect timeout
 	this.connectTimeout = null;
@@ -189,15 +194,13 @@ DataSift.prototype.connect = function() {
  * @return void
  */
 DataSift.prototype.disconnect = function(forced) {
-	if (forced) {
+	if (forced && this.request !== null) {
 		//Reset request and response
 		this.emit('disconnect');
 		
 		//Remove listeners
-		if (this.request != null) {
-			this.request.removeListener('error', this.errorCallback);
-			this.request.removeListener('response', this.responseCallback);
-		}
+		this.request.removeListener('error', this.errorCallback);
+		this.request.removeListener('response', this.responseCallback);
 		if (this.response != null) {
 			this.response.connection.removeListener('end', this.disconnectCallback);
 			this.response.removeListener('data', this.dataCallback);
@@ -207,7 +210,7 @@ DataSift.prototype.disconnect = function(forced) {
 		this.request = null;
 		this.response = null;
 		
-	} else {
+	} else if (this.request !== null) {
 		//Send the stop message and convert the error response
 		this.convertNextError = true;
 		this.send(JSON.stringify({"action":"stop"}));
