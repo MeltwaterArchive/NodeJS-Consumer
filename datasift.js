@@ -58,7 +58,7 @@ function DataSift(username, apiKey, host, port) {
 	this.connectTimeout = null;
 	
 	//Convert the next error to a success
-	this.convertNextError = true;
+	this.convertNextError = false;
 	
 	//Error callback
 	this.errorCallback = function(err, emitDisconnect) {
