@@ -21,7 +21,7 @@ function DataSift(username, apiKey, host, port) {
 	this.apiKey = apiKey;
 
 	//The user agent
-	this.userAgent = 'DataSiftNodeConsumer/0.1.3';
+	this.userAgent = 'DataSiftNodeConsumer/0.2.0';
 	
 	//The host
 	if (host !== undefined) {
@@ -56,6 +56,9 @@ function DataSift(username, apiKey, host, port) {
 	
 	//Connect timeout
 	this.connectTimeout = null;
+	
+	//Convert the next error to a success
+	this.convertNextError = false;
 	
 	//Error callback
 	this.errorCallback = function(err, emitDisconnect) {
@@ -162,7 +165,7 @@ DataSift.prototype.connect = function() {
 			if (self.request != null) {
 				self.request.abort();
 				self.errorCallback(new Error('Error connecting to DataSift: Timed out waiting for a response'));
-				self.disconnect();
+				self.disconnect(true);
 			}
 			clearTimeout(self.connectTimeout);
 			self.connectTimeout = null;
@@ -191,24 +194,27 @@ DataSift.prototype.connect = function() {
  * @return void
  */
 DataSift.prototype.disconnect = function(forced) {
-	if (forced) {
+	if (forced && this.request !== null) {
 		//Reset request and response
 		this.emit('disconnect');
-	}
-	
-	//Remove listeners
-	if (this.request != null) {
+		
+		//Remove listeners
 		this.request.removeListener('error', this.errorCallback);
 		this.request.removeListener('response', this.responseCallback);
+		if (this.response != null) {
+			this.response.connection.removeListener('end', this.disconnectCallback);
+			this.response.removeListener('data', this.dataCallback);
+		}
+
+		//Clear the request and response objects
+		this.request = null;
+		this.response = null;
+		
+	} else if (this.request !== null) {
+		//Send the stop message and convert the error response
+		this.convertNextError = true;
+		this.send(JSON.stringify({"action":"stop"}));
 	}
-	if (this.response != null) {
-		this.response.connection.removeListener('end', this.disconnectCallback);
-		this.response.removeListener('data', this.dataCallback);
-	}
-	
-	//Clear the request and response objects
-	this.request = null;
-	this.response = null;
 };
 
 
@@ -220,19 +226,13 @@ DataSift.prototype.disconnect = function(forced) {
  * @return void
  */
 DataSift.prototype.subscribe = function(hash) {
-	
 	//Check the hash
 	if (!this.checkHash(hash)) {
 		//Send error
 		this.emit('error', new Error('Invalid hash given: ' + hash));
 	} else {
 		//Send json message to DataSift to subscribe
-		var json = {"action":"subscribe", "hash":hash};
-		if (this.request != null) {
-			this.request.write(JSON.stringify(json) + "\r\n", 'utf8');
-		} else {
-			this.errorCallback(new Error('You cannot subscribe without being connected to DataSift'));
-		}
+		this.send(JSON.stringify({"action":"subscribe", "hash":hash}));
 	}
 };
 
@@ -245,19 +245,29 @@ DataSift.prototype.subscribe = function(hash) {
  * @return void
  */
 DataSift.prototype.unsubscribe = function(hash) {
-	
 	//Check the hash
 	if (!this.checkHash(hash)) {
 		//Send error
 		this.emit('error', new Error('Invalid hash given: ' + hash));
 	} else {
-		//Send json message to DataSift to subscribe
-		var json = {"action":"unsubscribe", "hash":hash};
-		if (this.request != null) {
-			this.request.write(JSON.stringify(json), 'utf8');
-		} else {
-			this.errorCallback('error', new Error('You cannot subscribe without being connected to DataSift'));
-		}
+		//Send json message to DataSift to unsubscribe
+		this.send(JSON.stringify({"action":"unsubscribe", "hash":hash}));
+	}
+};
+
+
+/**
+ * Send data to DataSift
+ *
+ * @param string message the message
+ * 
+ * @return void
+ */
+DataSift.prototype.send = function(message) {
+	if (this.request != null) {
+		this.request.write(message, 'utf8');
+	} else {
+		this.emit('error', new Error('You cannot send actions without being connected to DataSift'));
 	}
 };
 
@@ -272,12 +282,21 @@ DataSift.prototype.unsubscribe = function(hash) {
 DataSift.prototype.receivedData = function(json) {
 	//Check for errors
 	if (json.status == "failure") {
-		this.errorCallback(new Error(json.message));
-		this.disconnect(true);
+		if (this.convertNextError) {
+			this.emit('success', json.message);
+			this.convertNextError = false;
+		} else {
+			this.errorCallback(new Error(json.message));
+			this.disconnect(true);
+		}
 	
 	//Check for warnings
 	} else if (json.status == "warning") {
-		this.emit('warning', json.message);
+		this.emit('warning', json.message, json);
+	
+	//Check for successes
+	} else if (json.status == "success") {
+		this.emit('success', json.message, json);
 	
 	//Check for deletes
 	} else if (json.data !== undefined && json.data.deleted === true) {
