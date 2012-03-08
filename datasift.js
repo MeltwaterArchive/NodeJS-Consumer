@@ -21,7 +21,7 @@ function DataSift(username, apiKey, host, port) {
 	this.apiKey = apiKey;
 
 	//The user agent
-	this.userAgent = 'DataSiftNodeConsumer/0.1.4';
+	this.userAgent = 'DataSiftNodeConsumer/0.2.0';
 	
 	//The host
 	if (host !== undefined) {
@@ -254,9 +254,9 @@ DataSift.prototype.unsubscribe = function(hash) {
 
 
 /**
- * Unsubscribe from a hash
+ * Send data to DataSift
  *
- * @param string hash the stream hash
+ * @param string message the message
  * 
  * @return void
  */
