@@ -48,14 +48,12 @@ function DataSift(username, apiKey, host, port) {
 	
 	//Data
 	this.data = '';
-
-	//Add a listener for processing closing
-	process.on('exit', function () {
-		self.disconnect();
-	});
 	
 	//Connect timeout
 	this.connectTimeout = null;
+	
+	//Convert the next error to a success
+	this.convertNextError = true;
 	
 	//Error callback
 	this.errorCallback = function(err, emitDisconnect) {
@@ -162,7 +160,7 @@ DataSift.prototype.connect = function() {
 			if (self.request != null) {
 				self.request.abort();
 				self.errorCallback(new Error('Error connecting to DataSift: Timed out waiting for a response'));
-				self.disconnect();
+				self.disconnect(true);
 			}
 			clearTimeout(self.connectTimeout);
 			self.connectTimeout = null;
@@ -194,32 +192,26 @@ DataSift.prototype.disconnect = function(forced) {
 	if (forced) {
 		//Reset request and response
 		this.emit('disconnect');
-	}
-	
-	//Remove listeners
-	if (this.request != null) {
-		this.request.removeListener('error', this.errorCallback);
-		this.request.removeListener('response', this.responseCallback);
-	}
-	if (this.response != null) {
-		this.response.connection.removeListener('end', this.disconnectCallback);
-		this.response.removeListener('data', this.dataCallback);
-	}
-	
-	//Clear the request and response objects
-	this.request = null;
-	this.response = null;
-};
+		
+		//Remove listeners
+		if (this.request != null) {
+			this.request.removeListener('error', this.errorCallback);
+			this.request.removeListener('response', this.responseCallback);
+		}
+		if (this.response != null) {
+			this.response.connection.removeListener('end', this.disconnectCallback);
+			this.response.removeListener('data', this.dataCallback);
+		}
 
-
-/**
- * Subscribe to a hash
- * 
- * @return void
- */
-DataSift.prototype.stop = function() {
-	//Send json message to DataSift to subscribe
-	this.send(JSON.stringify({"action":"stop"}));
+		//Clear the request and response objects
+		this.request = null;
+		this.response = null;
+		
+	} else {
+		//Send the stop message and convert the error response
+		this.convertNextError = true;
+		this.send(JSON.stringify({"action":"stop"}));
+	}
 };
 
 
@@ -287,12 +279,21 @@ DataSift.prototype.send = function(message) {
 DataSift.prototype.receivedData = function(json) {
 	//Check for errors
 	if (json.status == "failure") {
-		this.errorCallback(new Error(json.message));
-		this.disconnect(true);
+		if (this.convertNextError) {
+			this.emit('success', json.message);
+			this.convertNextError = false;
+		} else {
+			this.errorCallback(new Error(json.message));
+			this.disconnect(true);
+		}
 	
 	//Check for warnings
 	} else if (json.status == "warning") {
-		this.emit('warning', json.message);
+		this.emit('warning', json.message, json);
+	
+	//Check for successes
+	} else if (json.status == "success") {
+		this.emit('success', json.message, json);
 	
 	//Check for deletes
 	} else if (json.data !== undefined && json.data.deleted === true) {
