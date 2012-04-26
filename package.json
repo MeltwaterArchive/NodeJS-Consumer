@@ -1,0 +1,16 @@
+{
+    "name": "datasift",
+    "version": "0.2.0",
+    "description": "DataSift streaming API consumer",
+    "main": "datasift.js",
+    "keywords": [
+        "datasift",
+        "twitter",
+        "facebook",
+        "streaming"
+    ],
+    "repository": {
+        "type": "git",
+        "url": "https://ollieparsley@github.com/datasift/NodeJS-Consumer.git"
+    }
+}
