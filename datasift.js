@@ -85,7 +85,7 @@ function DataSift(username, apiKey, host, port) {
 		self.data += chunk;
 		
 		//If the string contains a line break we will have JSON to process
-		if (chunk.indexOf("\n") > 0) {
+		if (chunk.indexOf("\n") >= 0) {
 			//Split by line space and look for json start
 			var data = self.data.split("\n");
 			if (data[0] !== undefined) {
