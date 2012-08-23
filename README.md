@@ -1,3 +1,4 @@
+[![build status](https://secure.travis-ci.org/datasift/NodeJS-Consumer.png)](http://travis-ci.org/datasift/NodeJS-Consumer)
 # DataSift consumer for NodeJS
 
 This library gives easy access to the real-time data coming from one or more DataSift streams.
