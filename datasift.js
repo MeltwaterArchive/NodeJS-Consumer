@@ -106,7 +106,7 @@ __.prototype._connect = function () {
 
     self.request = http.request(options, function(response) {
         response.setEncoding('utf-8');
-        this.statusCode = response.statusCode;
+        self.statusCode = response.statusCode;
         d.resolve(response);
     });
 
@@ -301,6 +301,11 @@ __.prototype._onEnd = function() {
     this.emit('warning', 'received end from server');
     if(this.statusCode !== 200) {
         this.emit('warning', 'connection ended with a bad status ' + this.statusCode +' code with the message: ' + this.responseData);
+        if(this.statusCode === 401){
+            this.emit('warning', 'invalid credentials');
+            this._transitionTo('disconnected');
+            return;
+        }
     } else {
         try {
             var eventData = JSON.parse(this.responseData);
