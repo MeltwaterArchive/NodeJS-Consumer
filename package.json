@@ -9,8 +9,8 @@
         "facebook",
         "streaming"
     ],
-    "repository": {
-        "type": "git",
-        "url": "https://ollieparsley@github.com/datasift/NodeJS-Consumer.git"
+    "dependencies": {
+        "q": "",
+        "winston":""
     }
 }
