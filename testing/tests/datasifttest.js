@@ -222,7 +222,7 @@ exports['onEnd'] = {
     'will handle non-200 status codes' : function (test) {
         var ds = DataSift.create('a','b','c','d');
 
-        ds.statusCode = 404;
+        ds.statusCode = 400;
         ds.responseData = 'not found';
         ds.connectionState = 'connected';
         ds.on('warning', function(message){
@@ -281,7 +281,31 @@ exports['onEnd'] = {
         ds._onEnd();
         test.expect(3);
         test.done();
+    },
+    'will handle bad credentials 401 status code' : function(test){
+        var ds = DataSift.create('a','b');
+        ds._transitionTo = function (to) {
+            test.equal(to,'disconnected');
+        };
+
+        ds.statusCode = 401;
+
+        ds._onEnd();
+        test.done();
+    },
+
+    'will handle bad stream hash with 404 status' : function (test) {
+        var ds = DataSift.create('a','b');
+        ds._transitionTo = function (to) {
+            test.equal(to,'disconnected');
+        };
+
+        ds.statusCode = 404;
+
+        ds._onEnd();
+        test.done();
     }
+
 
 }
 

@@ -306,6 +306,11 @@ __.prototype._onEnd = function() {
             this._transitionTo('disconnected');
             return;
         }
+        if(this.statusCode === 404){
+            this.emit('warning', 'invalid stream hash or end point not found');
+            this._transitionTo('disconnected');
+            return;
+        }
     } else {
         try {
             var eventData = JSON.parse(this.responseData);
