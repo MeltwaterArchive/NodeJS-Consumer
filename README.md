@@ -33,30 +33,27 @@ Stop and disconnects to the DataSift stream.
 
     ds.stop();
 ###Putting it all together
-    var DataSift = require('path/to/datasift.js');
+See also the example.js file.
 
-    //Create a datasift instance via the static method like:
+    var DataSift = require('datasift');
+
+    // create a datasift instance via the factory method
     var ds = DataSift.create('YOUR_ACCOUNT', 'YOUR_API_KEY');
 
-    //To start listening call the start method:
+    // start listening to the stream:
 
     ds.start('YOUR_STREAM_HASH').then(
-        function() {
-            //put your interaction listeners here
-            ds.on('interaction', function(message) {
-                //process the message;
-            }
+        function () {
+            console.log("Connected to DataSift");
+        },
+        function () {
+            console.log("Error connecting to DataSift");
+        }
+    );
 
-    ds.on('interaction', function(message) {
-                    //process the message;
-                }
-    ds.start('YOUR_STREAM_HASH').then(
-        function() {
-            //successful start
-
-        }, function(err) {
-            //error starting the listener
-        });
+    ds.on('interaction', function (message) {
+        //process the message;
+    });
 
 ## events emitted
 ###interaction(data)
