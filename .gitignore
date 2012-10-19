@@ -1,0 +1,7 @@
+.idea
+.DS_Store
+node_modules
+cover_html
+.coverage_data
+npm-debug.log
+datasift.log
