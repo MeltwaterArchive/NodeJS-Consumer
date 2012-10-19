@@ -10,6 +10,7 @@ Note that this module is promise based (via the Q library) and event based (via 
 - You have a DataSift account (username and API key) available from http://datasift.com
 
 ## Install
+- Using npm `npm install datasift`
 - Add it to your project `require('datasift.js');`
 
 ## Use
