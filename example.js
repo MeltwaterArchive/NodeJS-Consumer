@@ -3,17 +3,14 @@
 var DataSift = require('datasift');					//When using npm installation
 
 //Create a new instance of the DataSift consumer
-var consumer = new DataSift('username', 'api_key');
+var consumer = DataSift.create('username', 'api_key');
 
 //Connect
-consumer.connect();
-
-//Emitted when stream is connected
-consumer.on("connect", function(){
-	console.log("Connected!");
-	//Subscribe to Foursquare and Gowalla checkins
-	consumer.subscribe('e4941c3a0b4a905314ce806dea26e0d7'); 
-});
+//Subscribe to Foursquare and Gowalla checkins
+consumer.start('e4941c3a0b4a905314ce806dea26e0d7').then(
+    function() {
+	    console.log("Connected!");
+    });
 
 //Emitted when there is an error
 consumer.on("error", function(error){
