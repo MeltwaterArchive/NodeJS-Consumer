@@ -63,7 +63,8 @@ __.prototype.start = function (hash) {
     if(self.connectionState !== 'disconnected') {
         return Q.resolve();
     }
-    return this._establishConnection();
+    //return this._establishConnection();
+    return this._transitionTo('connecting');
 };
 
 /**
@@ -84,57 +85,70 @@ __.prototype._connect = function () {
     var self = this;
     var options;
 
-    if(self.connectionState !== 'disconnected') {
+    if(this.connectionState !== 'disconnected') {
         return Q.resolve();
     }
 
-    Q.delay(self._calculateReconnectDelay());
+    return Q.delay(this._calculateReconnectDelay()).then(
+        function(){
+            self.connectionState = 'connecting';
+            var d = Q.defer();
 
-    self.connectionState = 'connecting';
-    var d = Q.defer();
+            options =  parseUrl(self.host, true);
+            options.port = self.port;
+            options.method = 'GET';
+            options.headers = {
+                'User-Agent'        : self.userAgent,
+                'Host'              : self.host,
+                'Connection'        : 'Keep-Alive',
+                'Transfer-Encoding' : 'chunked',
+                'Authorization'     : self.username + ':' + self.apiKey
+            };
 
-    options =  parseUrl(this.host, true);
-    options.port = this.port;
-    options.method = 'GET';
-    options.headers = {
-        'User-Agent'        : this.userAgent,
-        'Host'              : this.host,
-        'Connection'        : 'Keep-Alive',
-        'Transfer-Encoding' : 'chunked',
-        'Authorization'     : this.username + ':' + this.apiKey
-    };
+            self.request = http.request(options, function(response) {
+                response.setEncoding('utf-8');
+                self.statusCode = response.statusCode;
+                if(response.statusCode !== 200){
+                    var message = '';
+                    response.on('data', function(data) {
+                        message += data;
+                    });
+                    response.on('end', function() {
+                        d.reject('received bad status code: ' + response.statusCode + ' with message: ' + message);
+                    });
+                } else {
+                    d.resolve(response);
+                }
+            });
 
-    self.request = http.request(options, function(response) {
-        response.setEncoding('utf-8');
-        self.statusCode = response.statusCode;
-        d.resolve(response);
-    });
+            self.request.on('socket', function (socket) {
+                socket.setTimeout(__.SOCKET_TIMEOUT);
 
-    self.request.on('socket', function (socket) {
-        socket.setTimeout(__.SOCKET_TIMEOUT);
+                socket.on('timeout', function() {
+                    self.emit('warning', 'socket time out.  reconnecting');
+                    socket.destroy();
+                });
 
-        socket.on('timeout', function() {
-            socket.destroy();
-            if(Q.isPromise(d.promise)) { //only call if the promise has already been resolved.
-                self.emit('warning', 'socket time out.  reconnecting');
-                self._transitionTo('connected');
-            }
-        });
+                socket.on('close', function (hasError) {
+                    if(hasError) {
+                        socket.destroy();
+                    }
+                });
+            });
 
-        socket.on('close', function (hasError) {
-            if(hasError) {
-                socket.destroy();
-            }
-        });
-    });
+            self.request.on('error', function (e) {
+                if(Q.isResolved(d.promise)) { //only call if the promise has already been resolved.
+                    self._transitionTo('connected');
+                } else {
+                    d.reject(e);
+                }
+            });
 
-    self.request.on('error', function (e) {
-        d.reject(e);
-    });
+            self.request.write('\n', 'utf-8');
 
-    self.request.write('\n', 'utf-8');
-
-    return d.promise;
+            return d.promise;
+        }
+    );
 };
 
 /**
@@ -143,10 +157,31 @@ __.prototype._connect = function () {
  */
 __.prototype._subscribe = function () {
     if(this.connectionState === 'disconnected') {
-        return;
+        return Q.resolve();
     }
+
+    var badSubscribe = false;
+    var d = Q.defer();
+    var self = this;
+
+    this.once('warning', function(message) {
+        if(!message.indexOf('You did not send a valid hash to subscribe to',-1)){
+            badSubscribe = true;
+            d.reject('bad stream hash (' + self.hash + ').');
+            self.statusCode =  404;
+        }
+    });
     var body = JSON.stringify({'action' : 'subscribe', 'hash' : this.hash});
+
     this.request.write(body, 'utf-8');
+
+    Q.delay(750).then(
+        function() {
+            d.resolve();
+        }
+    );
+
+    return d.promise;
 };
 
 /**
@@ -166,7 +201,7 @@ __.prototype._unsubscribe = function () {
  * @private
  */
 __.prototype._disconnect = function () {
-    if(this.connectionState !== 'connected'){
+    if(this.connectionState === 'disconnected'){
         return;
     }
     var body = JSON.stringify({'action' : 'stop'});
@@ -194,7 +229,6 @@ __.prototype._handleEvent = function (eventData) {
     } else if (eventData.tick !== undefined) {
         this.emit('tick', eventData);
     } else if (eventData.data !== undefined && eventData.data.interaction !== undefined) {
-        //self.emit('interaction', eventData.data.interaction);
         this.emit('interaction', eventData);
     } else {
         this.emit('unknownEvent', eventData);
@@ -241,10 +275,14 @@ __.prototype._transitionTo = function(stateTo) {
             break;
         case 'connected':
             if (this.connectionState === 'connecting') {
-                this._subscribe();
-                this.connectionState = 'connected';
-                this.emit('connect');
-                this.reconnectAttempts = 0;
+                var self = this;
+                return this._subscribe().then(
+                    function() {
+                        self.connectionState = 'connected';
+                        self.emit('connect');
+                        self.reconnectAttempts = 0;
+                    }
+                );
             } else {
                 this.connectionState = 'disconnected';
                 this._transitionTo('connecting');
@@ -271,8 +309,9 @@ __.prototype._transitionTo = function(stateTo) {
  * @param chunk
  * @private
  */
-__.prototype._onData = function(chunk){
+__.prototype._onData = function(chunk) {
     this.responseData += chunk;
+
     if(chunk.indexOf('\n') >= 0) {
         var data = this.responseData.split('\n');
         this.responseData = data.pop();
@@ -282,7 +321,7 @@ __.prototype._onData = function(chunk){
                 try {
                     eventData = JSON.parse(data[i]);
                 } catch(e) {
-                    this.emit('warning', 'could not parse into JSON: ' + data + ' with error: ' + e.toString());  //more details
+                    this.emit('warning', 'could not parse into JSON: ' + data[i] + ' with error: ' + e.toString());  //more details
                     continue;
                 }
                 if (eventData) {
@@ -301,26 +340,21 @@ __.prototype._onEnd = function() {
     this.emit('warning', 'received end from server');
     if(this.statusCode !== 200) {
         this.emit('warning', 'connection ended with a bad status ' + this.statusCode +' code with the message: ' + this.responseData);
-        if(this.statusCode === 401){
-            this.emit('warning', 'invalid credentials');
-            this._transitionTo('disconnected');
-            return;
-        }
-        if(this.statusCode === 404){
-            this.emit('warning', 'invalid stream hash or end point not found');
-            this._transitionTo('disconnected');
+        if(this.statusCode === 404 || this.statusCode === 401) {
+            //guard against already handled events (bad hash or user id/key pair
             return;
         }
     } else {
         try {
             var eventData = JSON.parse(this.responseData);
+            if (eventData) {
+                this._handleEvent(eventData);
+            }
         } catch(e) {
             this.emit('warning', 'partial data remains: ' + this.responseData);
         }
-        if (eventData) {
-            this._handleEvent(eventData);
-        }
     }
+
     this.responseData = '';
     this._transitionTo('connected');
 };
@@ -338,9 +372,18 @@ __.prototype._establishConnection = function() {
             self.connectionState = 'connecting';
             response.on('end', self._onEnd.bind(self));
             response.on('data', self._onData.bind(self));
-        }).then( function(){
-            self._transitionTo('connected');
+            return self._transitionTo('connected').then(
+                function(){
+                    //nothing
+                }, function(err) {
+                    self._transitionTo('disconnected');
+                    return Q.reject(err);
+                }
+            );
         }, function(err) {
+            if(self.statusCode !== undefined && self.statusCode !== 200) {
+                return Q.reject(err);
+            }
             self.connectionState = 'disconnected';
             self._transitionTo('connecting');
         });
