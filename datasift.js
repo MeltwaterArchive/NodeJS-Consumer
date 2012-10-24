@@ -21,6 +21,8 @@ var __ = function () {
 
 __.prototype = new EventEmitter();
 __.SOCKET_TIMEOUT = 60000;
+__.SUBSCRIBE_WAIT = 750;
+
 /**
  * factory method for creating a DataSift instance
  *
@@ -175,7 +177,7 @@ __.prototype._subscribe = function () {
 
     this.request.write(body, 'utf-8');
 
-    Q.delay(750).then(
+    Q.delay(__.SUBSCRIBE_WAIT).then(
         function() {
             d.resolve();
         }
@@ -339,9 +341,9 @@ __.prototype._onData = function(chunk) {
 __.prototype._onEnd = function() {
     this.emit('warning', 'received end from server');
     if(this.statusCode !== 200) {
-        this.emit('warning', 'connection ended with a bad status ' + this.statusCode +' code with the message: ' + this.responseData);
+        this.emit('warning', 'connection ended with a bad status ' + this.statusCode);
         if(this.statusCode === 404 || this.statusCode === 401) {
-            //guard against already handled events (bad hash or user id/key pair
+            //guard against already handled events (bad hash or user id/key pair)
             return;
         }
     } else {
