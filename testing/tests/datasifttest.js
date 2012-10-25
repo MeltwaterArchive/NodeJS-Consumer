@@ -467,6 +467,26 @@ exports['establishConnection'] = {
                 test.done();
             }
         ).end();
+    },
+
+    'will handle promise resolve when the state is other than disconnected' : function(test) {
+        var ds = DataSift.create('a','b');
+
+        ds.connectionState = 'connecting';
+
+        ds.on('warning', function(m){
+            test.ok(true);
+        });
+
+        test.expect(1);
+        ds._establishConnection().then(
+            function() {
+                test.done();
+            }, function(err) {
+                test.ok(true);
+                test.done();
+            }
+        ).end();
     }
 
 }
@@ -926,6 +946,7 @@ exports['transitionTo'] = {
 //                    if(lastTime === undefined) {
 //                        lastTime = Date.now();
 //                    } else {
+//                        console.log(Date.now());
 //                        console.log(Date.now() - lastTime);
 //                        lastTime = Date.now();
 //                    }
@@ -969,19 +990,20 @@ exports['transitionTo'] = {
 //            console.log(err);
 //
 //        });
+//        ds._transitionTo('connected');
 //
-//        ds.start('123').then(function() {
-//            console.log('connected');
-//            var timeout = setTimeout(function(){
-//                console.log('timeout');
-//                server.close();
-//                test.done();
-//            }, 10000);
-//
-//        }, function (err)  {
-//            console.log('this is an error');
-//            console.log(err);
-//
-//        });
+////        ds.start('123').then(function() {
+////            console.log('connected');
+////            var timeout = setTimeout(function(){
+////                console.log('timeout');
+////                server.close();
+////                test.done();
+////            }, 10000);
+////
+////        }, function (err)  {
+////            console.log('this is an error');
+////            console.log(err);
+////
+////        });
 //    }
 //}

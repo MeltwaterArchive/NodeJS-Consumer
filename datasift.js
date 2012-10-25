@@ -169,8 +169,8 @@ __.prototype._subscribe = function () {
     this.once('warning', function(message) {
         if(!message.indexOf('You did not send a valid hash to subscribe to',-1)){
             badSubscribe = true;
-            d.reject('bad stream hash (' + self.hash + ').');
             self.statusCode =  404;
+            d.reject('bad stream hash (' + self.hash + ').');
         }
     });
     var body = JSON.stringify({'action' : 'subscribe', 'hash' : this.hash});
@@ -371,13 +371,14 @@ __.prototype._establishConnection = function() {
     this.responseData = '';
     return self._connect()
         .then(function(response) {
+            if(!response) {
+                return Q.reject('connect did not return a response object');
+            }
             self.connectionState = 'connecting';
             response.on('end', self._onEnd.bind(self));
             response.on('data', self._onData.bind(self));
-            return self._transitionTo('connected').then(
-                function(){
-                    //nothing
-                }, function(err) {
+            return self._transitionTo('connected').fail(
+                function(err) {
                     self._transitionTo('disconnected');
                     return Q.reject(err);
                 }
@@ -386,6 +387,7 @@ __.prototype._establishConnection = function() {
             if(self.statusCode !== undefined && self.statusCode !== 200) {
                 return Q.reject(err);
             }
+            self.emit('warning', 'unable to connect with error: '+ err);
             self.connectionState = 'disconnected';
             self._transitionTo('connecting');
         });
