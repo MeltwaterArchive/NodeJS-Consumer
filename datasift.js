@@ -75,8 +75,10 @@ __.prototype.start = function (hash) {
  * @return {promise}
  */
 __.prototype.stop = function () {
-    this._transitionTo('disconnected');
-    return Q.resolve();
+    var self = this;
+    return Q.fcall(function(){
+        self._transitionTo('disconnected');
+    });
 };
 
 /**
@@ -158,13 +160,15 @@ __.prototype._connect = function () {
  * @param hash
  */
 __.prototype._subscribe = function () {
-    if(this.connectionState === 'disconnected') {
+    //if(this.connectionState === 'disconnected') {
+    if(this.connectionState !== 'connecting') {
         return Q.resolve();
     }
 
     var badSubscribe = false;
     var d = Q.defer();
     var self = this;
+    var body = JSON.stringify({'action' : 'subscribe', 'hash' : this.hash});
 
     this.once('warning', function(message) {
         if(!message.indexOf('You did not send a valid hash to subscribe to',-1)){
@@ -173,7 +177,6 @@ __.prototype._subscribe = function () {
             d.reject('bad stream hash (' + self.hash + ').');
         }
     });
-    var body = JSON.stringify({'action' : 'subscribe', 'hash' : this.hash});
 
     this.request.write(body, 'utf-8');
 

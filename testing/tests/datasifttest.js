@@ -133,10 +133,6 @@ exports['connect'] = {
         DataSift.SOCKET_TIMEOUT = 1;
         test.expect(1);
 
-//        ds._transitionTo = function (state) {
-//            test.ok(true);
-//        };
-
         ds._connect().then( function () {
             test.ok(false);
             test.done();
@@ -211,16 +207,10 @@ exports['onData'] = {
 
         var ds = DataSift.create('a','b','c','d');
         var testData = [];
-        //test.expect(4);
+
         ds._handleEvent = function (data) {
             testData.push(data);
         };
-
-        ds.on('warning', function(message) {
-            //console.log(message);
-            //test.notEqual(message.indexOf('{"b" '), -1); //emits the bad json as a warning
-            //test.ok(true);
-        });
 
         var chunk = '{"a" : 1}\n{"b"\n{"c":3}\n{"c":\n{"d":';
         var expectedData = [{a:1}, {c:3}];
@@ -254,29 +244,7 @@ exports['onData'] = {
         test.equal(ds.responseData, '{ d');
         test.done();
 
-    },
-//
-//    'will handle poor json' : function(test) {
-//        var chunk = '{"a":\n{"b":123}\n{"c":123\n}{a:123}';
-//        var ds = DataSift.create('a','b');
-//        var testData = [];
-//
-//        ds._handleEvent = function (data) {
-//            testData.push(data);
-//        };
-//
-//        ds.on('warning', function(d){
-//            console.log(d);
-//            test.ok(false);
-//        });
-//
-//        ds._transitionTo = function (to) {
-//        };
-//        var chunk = '{"hash":"2c304a1f578a147e2d1e8c6235070a63", "data":{"interaction":{"schema":{"version":3},"source":"Tweet Button","author":{"username":"lakisharaychell","name":"lakisha raychelle","id":496357914,"avatar":"http://a0.twimg.com/profile_images/2736153135/50819749eb69ae714100a987e56312c2_normal.jpeg","link":"http://twitter.com/lakisharaychell"},"type":"twitter","created_at":"Sat, 20 Oct 2012 17:10:20 +0000","content":"Johnnie Taylor ~ Just Because: http://t.co/8dX54Ivj via @youtube this song makes me think of my ex","id":"1e21ad906de6a600e07499608187aeee","link":"http://twitter.com/lakisharaychell/statuses/259703108588957696"},"klout":{"score":11},"language":{"tag":"en","confidence":100},"salience":{"content":{"sentiment":0}},"twitter":{"created_at":"Sat, 20 Oct 2012 17:10:20 +0000","domains":["youtu.be"],"id":"259703108588957696","links":["http://youtu.be/HSXrGLVUGGQ"],"mention_ids":[10228272],"mentions":["YouTube"],"source":"<a href=\"http://twitter.com/tweetbutton\" rel=\"nofollow\">Tweet Button</a>","text":"Johnnie Taylor ~ Just Because: http://t.co/8dX54Ivj via @youtube this song makes me think of my ex","user":{"name":"lakisha raychelle","description":"im very laid back and like to have fun loveme sone reality tv and proud of it \r\n","location":"greensboro , nc","statuses_count":98,"followers_count":14,"friends_count":89,"screen_name":"lak{"hash":"2c304a1f578a147e2d1e8c6235070a63", "data":{"interaction":{"schema":{"version":3},"source":"Tweet Button","author":{"username":"lakisharaychell","name":"lakisha raychelle","id":496357914,"avatar":"http://a0.twimg.com/profile_images/2736153135/50819749eb69ae714100a987e56312c2_normal.jpeg","link":"http://twitter.com/lakisharaychell"},"type":"twitter","created_at":"Sat, 20 Oct 2012 17:10:20 +0000","content":"Johnnie Taylor ~ Just Because: http://t.co/8dX54Ivj via @youtube this song makes me think of my ex","id":"1e21ad906de6a600e07499608187aeee","link":"http://twitter.com/lakisharaychell/statuses/259703108588957696"},"klout":{"score":11},"language":{"tag":"en","confidence":100},"salience":{"content":{"sentiment":0}},"twitter":{"created_at":"Sat, 20 Oct 2012 17:10:20 +0000","domains":["youtu.be"],"id":"259703108588957696","links":["http://youtu.be/HSXrGLVUGGQ"],"mention_ids":[10228272],"mentions":["YouTube"],"source":"<a href=\"http://twitter.com/tweetbutton\" rel=\"nofollow\">Tweet Button</a>","text":"Johnnie Taylor ~ Just Because: http://t.co/8dX54Ivj via @youtube this song makes me think of my ex","user":{"name":"lakisha raychelle","description":"im very laid back and like to ha';
-//        ds._onData(chunk);
-//
-//        test.done();
-//    }
+    }
 }
 
 exports['onEnd'] = {
@@ -537,11 +505,11 @@ exports['subscribe'] = {
         ).end();
 
     },
-    'will reject if a warning with invalid credentials is emitted' : function(test) {
+    'will reject a warning with invalid credentials is emitted' : function(test) {
         var ds = DataSift.create('testuser', 'apiKey');
         ds.hash = 'abc123';
 
-        ds.connectionState = 'connected';
+        ds.connectionState = 'connecting';
         ds.request = {};
 
         ds.request.write = function (body, encoding){
@@ -573,12 +541,10 @@ exports['stop'] = {
 
         ds._unsubscribe = function () {
             test.ok(true);
-            return Q.resolve();
         };
 
         ds._disconnect = function () {
             test.ok(true);
-            return Q.resolve();
         };
 
         ds.stop().then(function () {
@@ -922,88 +888,3 @@ exports['transitionTo'] = {
         test.done();
     }
 }
-
-//exports['intergrationTest'] = {
-//    tearDown : function(cb) {
-//        DataSift.SOCKET_TIMEOUT = 60000;
-//        cb();
-//    },
-//    'success' : function (test) {
-//        DataSift.SOCKET_TIMEOUT = 10000;
-//
-//        var interactionData1 = {"test" : "def", "name" : "jon", "number" : 1};
-//        var eventData1 = { "hash": "123" , "data" : {"interaction": interactionData1}};
-//        var interactionData2 = {"test" : "abc", "name" : "jon", "number" : 1};
-//        var eventData2 = { "hash": "456" , "data" : {"interaction": interactionData2}};
-//        var lastTime;
-//
-//        var server = http.createServer(function (req, res) {
-//            req.setEncoding('utf-8');
-//            req.on('data', function (data) {
-//                console.log('data: ' + data);
-//                res.write(' ');
-//                if(data.indexOf('"subscribe"') !== -1) {
-//                    if(lastTime === undefined) {
-//                        lastTime = Date.now();
-//                    } else {
-//                        console.log(Date.now());
-//                        console.log(Date.now() - lastTime);
-//                        lastTime = Date.now();
-//                    }
-//                    console.log('writing data');
-//                    //res.write(JSON.stringify(eventData1) + '\n');
-//                    //res.write(JSON.stringify(eventData2) + '\n');
-//                    //res.write('{"hash":"2c304a1f578a147e2d1e8c6235070a63", "data":{"interaction":{"schema":{"version":3},"source":"Tweet Button","author":{"username":"lakisharaychell","name":"lakisha raychelle","id":496357914,"avatar":"http://a0.twimg.com/profile_images/2736153135/50819749eb69ae714100a987e56312c2_normal.jpeg","link":"http://twitter.com/lakisharaychell"},"type":"twitter","created_at":"Sat, 20 Oct 2012 17:10:20 +0000","content":"Johnnie Taylor ~ Just Because: http://t.co/8dX54Ivj via @youtube this song makes me think of my ex","id":"1e21ad906de6a600e07499608187aeee","link":"http://twitter.com/lakisharaychell/statuses/259703108588957696"},"klout":{"score":11},"language":{"tag":"en","confidence":100},"salience":{"content":{"sentiment":0}},"twitter":{"created_at":"Sat, 20 Oct 2012 17:10:20 +0000","domains":["youtu.be"],"id":"259703108588957696","links":["http://youtu.be/HSXrGLVUGGQ"],"mention_ids":[10228272],"mentions":["YouTube"],"source":"<a href=\"http://twitter.com/tweetbutton\" rel=\"nofollow\">Tweet Button</a>","text":"Johnnie Taylor ~ Just Because: http://t.co/8dX54Ivj via @youtube this song makes me think of my ex","user":{"name":"lakisha raychelle","description":"im very laid back and like to have fun loveme sone reality tv and proud of it \r\n","location":"greensboro , nc","statuses_count":98,"followers_count":14,"friends_count":89,"screen_name":"lak{"hash":"2c304a1f578a147e2d1e8c6235070a63", "data":{"interaction":{"schema":{"version":3},"source":"Tweet Button","author":{"username":"lakisharaychell","name":"lakisha raychelle","id":496357914,"avatar":"http://a0.twimg.com/profile_images/2736153135/50819749eb69ae714100a987e56312c2_normal.jpeg","link":"http://twitter.com/lakisharaychell"},"type":"twitter","created_at":"Sat, 20 Oct 2012 17:10:20 +0000","content":"Johnnie Taylor ~ Just Because: http://t.co/8dX54Ivj via @youtube this song makes me think of my ex","id":"1e21ad906de6a600e07499608187aeee","link":"http://twitter.com/lakisharaychell/statuses/259703108588957696"},"klout":{"score":11},"language":{"tag":"en","confidence":100},"salience":{"content":{"sentiment":0}},"twitter":{"created_at":"Sat, 20 Oct 2012 17:10:20 +0000","domains":["youtu.be"],"id":"259703108588957696","links":["http://youtu.be/HSXrGLVUGGQ"],"mention_ids":[10228272],"mentions":["YouTube"],"source":"<a href=\"http://twitter.com/tweetbutton\" rel=\"nofollow\">Tweet Button</a>","text":"Johnnie Taylor ~ Just Because: http://t.co/8dX54Ivj via @youtube this song makes me think of my ex","user":{"name":"lakisha raychelle","description":"im very laid back and like to ha');
-//                    res.write('{"hash":"2c304a1f578a147e2d1e8c6235070a63", "data":{"interaction":{"schema":{"version":3},"source":"Tweet Button","author":{"username":"NicoArqueros","name":"Nicolas Arqueros","id":68308933,"avatar":"http://a0.twimg.com/profile_images/2364599345/tu1sasgblpwwzcdinmit_normal.jpeg","link":"http://twitter.com/NicoArqueros"},"type":"twitter","created_at":"Sat, 20 Oct 2012 17:09:16 +0000","content":"Wow! Totally redesigned @bitbucket! Unlimited private git and hg repos, 5 users free and in-line commenting. #git #hg http://t.co/sNbuoP81","id":"1e21ad8e0b8ca600e074ae4679a850f8","link":"http://twitter.com/NicoArqueros/statuses/259702840069611520"},"klout":{"score":40},"language":{"tag":"en","confidence":100},"links":{"created_at":["Fri, 19 Oct 2012 20:45:48 +0000"],"retweet_count":[0],"title":["Free source code hosting for Git and Mercurial by Bitbucket"],"url":["https://bitbucket.org/"]},"salience":{"content":{"sentiment":0}},"twitter":{"created_at":"Sat, 20 Oct 2012 17:09:16 +0000","domains":["ow.ly"],"id":"259702840069611520","links":["http://ow.ly/egtr5"],"mention_ids":[174379786],"mentions":["bitbucket"],"source":"<a href=\"http://twitter.com/tweetbutton\" rel=\"nofollow\">Tweet Button</a>","text":"Wow! Totally redesigned @bitbucket! Unlimited private git and hg repos, 5 users free and in-line commenting. #git #hg http://t.co/sNbuoP81","user":{"{"hash":"2c304a1f578a147e2d1e8c6235070a63", "data":{"interaction":{"schema":{"version":3},"source":"Tweet Button","author":{"username":"NicoArqueros","name":"Nicolas Arqueros","id":68308933,"avatar":"http://a0.twimg.com/profile_images/2364599345/tu1sasgblpwwzcdinmit_normal.jpeg","link":"http://twitter.com/NicoArqueros"},"type":"twitter","created_at":"Sat, 20 Oct 2012 17:09:16 +0000","content":"Wow! Totally redesigned @bitbucket! Unlimited private git and hg repos, 5 users free and in-line commenting. #git #hg http://t.co/sNbuoP81","id":"1e21ad8e0b8ca600e074ae4679a850f8","link":"http://twitter.com/NicoArqueros/statuses/259702840069611520"},"klout":{"score":40},"language":{"tag":"en","confidence":100},"links":{"created_at":["Fri, 19 Oct 2012 20:45:48 +0000"],"retweet_count":[0],"title":["Free source code hosting for Git and Mercurial by Bitbucket"],"url":["https://bitbucket.org/"]},"salience":{"content":{"sentiment":0}},"twitter":{"created_at":"Sat, 20 Oct 2012 17:09:16 +0000","domains":["ow.ly"],"id":"259702840069611520","links":["http://ow.ly/egtr5"],"mention_ids":[174379786],"mentions":["bitbucket"],"source":"<a href=\"http://twitter.com/tweetbutton\" rel=\"nofollow\">Tweet Button</a>","text":"Wow! Totally redesigned @bitbucket! Unlimited private git and hg repos, 5 users free and in-line commenting. #git #hg http://t.co/sNbuoP81","user":{"name":"Nicolas Arqueros","description":"Always looking for something interesting that fulfills my need for a good challenge. Love my kindle and business books.","location":"Vi\u00F1a del Mar","statuses_count":698,"followers_count":288,"friends_count":372,"screen_name":"NicoArqueros","lang":"en","time_zone":"Santiago","utc_offset":-14400,"listed_count":1,"id":68308933,"id_str":"68308933","geo_enabled":true,"created_at":"Mon, 24 Aug 2009 02:55:55 +0000"}}}}');
-//                    res.write('name":"Nicolas Arqueros","description":"Always looking for something interesting that fulfills my need for a good challenge. Love my kindle and business books.","location":"Vi\u00F1a del Mar","statuses_count":698,"followers_count":288,"friends_count":372,"screen_name":"NicoArqueros","lang":"en","time_zone":"Santiago","utc_offset":-14400,"listed_count":1,"id":68308933,"id_str":"68308933","geo_enabled":true,"created_at":"Mon, 24 Aug 2009 02:55:55 +0000"}}}}');
-//                    var timeout1 = setTimeout(function(){
-//                        console.log('ending connection');
-//                        res.end();
-//                    }, 1000);
-//                }
-//
-//            });
-//        }).listen(1333, '127.0.0.1');
-//
-//        var ds = DataSift.create('testuser', 'testapi', 'http://localhost/', 1333);
-////        ds._handleEvent = function (e){
-////            console.log(e);
-////        };
-//
-//        ds.on('interaction', function(e){
-//            console.log(e);
-//        });
-//
-//        ds.on('warning', function(m){
-//            console.log(m);
-//        });
-//
-//        ds.start('123').then(function() {
-//            console.log('connected');
-//            var timeout = setTimeout(function(){
-//                console.log('timeout');
-//                server.close();
-//                test.done();
-//            }, 10000);
-//
-//        }, function (err)  {
-//            console.log(err);
-//
-//        });
-//        ds._transitionTo('connected');
-//
-////        ds.start('123').then(function() {
-////            console.log('connected');
-////            var timeout = setTimeout(function(){
-////                console.log('timeout');
-////                server.close();
-////                test.done();
-////            }, 10000);
-////
-////        }, function (err)  {
-////            console.log('this is an error');
-////            console.log(err);
-////
-////        });
-//    }
-//}
