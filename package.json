@@ -12,6 +12,7 @@
     "dependencies": {
         "q": "",
         "winston":"",
-        "nock":""
+        "nock":"",
+        "tenacious":"git://github.com/LocalResponse/tenacious.git"
     }
 }

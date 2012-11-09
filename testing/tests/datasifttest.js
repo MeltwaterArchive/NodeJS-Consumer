@@ -1,193 +1,373 @@
+
 /**
  * User: wadeforman
- * Date: 8/31/12
- * Time: 1:55 PM
+ * Date: 11/6/12
+ * Time: 10:47 AM
  */
 
 "use strict"
-
 var http = require('http');
+var Q = require ('q');
 var DataSift = require('../../datasift');
-var Q = require('q');
-var EventEmitter = require('events').EventEmitter;
-var nock = require('nock');
 
 exports['create'] = {
-    'can create instance with host and port params' : function (test) {
-        var ds = DataSift.create('testuser','apiKey','http://testurl.com/',90);
-        test.equal(ds.port, 90);
-        test.equal(ds.host, 'http://testurl.com/');
-        test.equal(ds.connectionState, 'disconnected');
+    'success' : function(test) {
+        var ds = DataSift.create('login','apiKey');
+
+        test.equal(ds.login, 'login');
+        test.equal(ds.apiKey, 'apiKey');
+
         test.done();
     },
 
-    'can create instance without host and port params' : function (test) {
-        var ds = DataSift.create('testuser', 'apikey');
-        test.equal(ds.port, 80);
-        test.equal(ds.host, 'http://stream.datasift.com/');
-        test.equal(ds.connectionState, 'disconnected');
-        test.done();
-    },
-
-    'requires a username' : function(test) {
+    'login is a required param' : function(test) {
         test.throws(
-            function() {
-              DataSift.create();
+            function(){
+                DataSift.create();
             }, Error
         );
         test.done();
     },
 
-    'requires a apiKey' : function(test) {
+    'apiKey is a required param' : function(test) {
         test.throws(
-            function() {
-                DataSift.create('testuser');
+            function(){
+                DataSift.create('login');
             }, Error
         );
         test.done();
     }
 }
 
-exports['start'] = {
+exports['subscribe'] = {
+    'success' : function(test) {
+        var ds = DataSift.create('login','apiKey');
 
-    'success' : function (test) {
-        var ds = DataSift.create('testuser','apiKey','http://datasifter.com/',80);
-
-        test.expect(1);
-
-        ds._establishConnection = function () {
+        test.expect(3);
+        ds._start = function() {
             test.ok(true);
             return Q.resolve();
         };
 
-        ds.start().then( function () {
-            test.done()
-        }, function () {
-            test.ok(false);
-            test.done();
-        }).end();
-    },
+        ds._subscribeToStream = function(hash){
+            test.equal(hash, 'abc123');
+            return Q.resolve();
+        };
 
-    'will resolve immediately if in any connection state other than disconnected' : function (test) {
-        var ds = DataSift.create('a','b');
-        ds.connectionState = 'connected';
-        ds.start('123').then(
+        ds.subscribe('abc123').then(
             function() {
                 test.ok(true);
                 test.done();
+            }, function(err) {
+                test.ok(false);
+                test.done();
             }
-        ).end();
+        ).done();
+    },
+
+    'will reject if client fails to connect' : function(test){
+        var ds = DataSift.create('login','apiKey');
+        test.expect(2);
+        ds._start = function() {
+            test.ok(true);
+            return Q.reject();
+        };
+
+        ds.subscribe('abc123').then(
+            function() {
+                test.ok(false);
+                test.done();
+            }, function(err) {
+                test.ok(true);
+                test.done();
+            }
+        ).done();
+    },
+
+    'will reject if subscribe fails' : function(test) {
+        var ds = DataSift.create('login','apiKey');
+        test.expect(4);
+        ds._start = function() {
+            test.ok(true);
+            return Q.resolve();
+        };
+
+        ds.shutdown = function() {
+            test.ok(true);
+            return Q.resolve();
+        };
+
+        ds._subscribeToStream = function(hash) {
+            test.ok(true);
+            return Q.reject('failed to sub');
+        };
+
+        ds.subscribe().then(
+            function() {
+                test.ok(false);
+                test.done();
+            }, function(err) {
+                test.ok(true);
+                test.done();
+            }
+        ).done();
     }
 }
 
-exports['connect'] = {
-    tearDown : function(cb) {
-        DataSift.SOCKET_TIMEOUT = 60000;
+exports['subscribeToStream'] = {
+    setUp: function (cb) {
+        DataSift.SUBSCRIBE_WAIT = 50;
         cb();
     },
-       'success' : function (test) {
-        test.expect(3);
 
-        var server = http.createServer(function (req, res) {
-            req.setEncoding('utf-8');
-            req.on('data', function (data) {
-                test.equal(data, '\n');
-                res.end();
-            });
-        }).listen(1333, '127.0.0.1');
+    tearDown : function (cb) {
+        DataSift.SUBSCRIBE_WAIT = 50;
+        cb();
+    },
 
-        var ds = DataSift.create('testuser', 'testapi', 'http://localhost/', 1333);
+    'will subscribe to a stream' : function (test) {
+        var ds = DataSift.create('testuser', 'apyKey');
 
-        ds._calculateReconnectDelay = function(){
+        ds.client = {};
+        ds.client.write = function (body, encoding){
+            test.equal(body,'{"action":"subscribe","hash":"abc123"}' );
+        };
+
+        ds._subscribeToStream('abc123').then(
+            function(){
+                test.done();
+            }
+        ).done();
+
+    },
+
+    'will reject a warning with invalid credentials is emitted' : function(test) {
+        var ds = DataSift.create('testuser', 'apiKey');
+
+        ds.client = {};
+
+        ds.client.write = function (body, encoding){
+            test.equal(body,'{"action":"subscribe","hash":"abc123"}' );
+        };
+
+        ds._subscribeToStream('abc123').then(
+            function(){
+                test.ok(false);
+                test.done();
+            }, function(err){
+                test.notEqual(err.indexOf('abc123'), -1);
+                test.done();
+            }
+        )
+        ds.emit('warning', 'You did not send a valid hash to subscribe to')
+
+    }
+}
+
+exports['start'] = {
+    'success' : function(test) {
+        var ds = DataSift.create('testuser', 'apiKey');
+        test.expect(2);
+        ds.client.start = function(){
+            test.ok(true);
+            return Q.resolve();
+        };
+
+        ds._start().then(
+            function() {
+                test.ok(true);
+                test.done();
+            }, function(err) {
+                test.ok(false);
+                test.done();
+            }
+        ).done();
+    },
+
+    'will call onData when a data event is emitted by the client' : function(test) {
+        var ds = DataSift.create('testuser', 'apiKey');
+        ds.client.start = function() {
+            return Q.resolve();
+        };
+
+        ds._onData = function(data, statusCode) {
+            test.equal(data, 'my data');
+            test.equal(statusCode, 200);
+            test.done();
+        };
+
+        ds._start();
+        ds.client.emit('data', 'my data', 200);
+    },
+
+    'will call onEnd when an end event is emitted by the client' : function(test) {
+        var ds = DataSift.create('testuser', 'apiKey');
+        ds.client.start = function() {
+            return Q.resolve();
+        };
+
+        ds._onEnd = function(statusCode) {
+            test.equal(statusCode, 401);
+            test.done();
+        };
+
+        ds._start();
+        ds.client.emit('end', 401);
+    }
+}
+
+exports['handleEvent'] = {
+    'success' : function (test) {
+        var ds = DataSift.create('testuser','apiKey');
+        var interactionData = {'test' : 'abc', 'name' : 'jon', 'number' : 1};
+        var eventData = { 'hash': '123' , 'data' : {'interaction': interactionData}};
+        test.expect(1);
+        ds.on('interaction', function (eventReceived) {
+            test.deepEqual(eventReceived, eventData);
+            test.done();
+        });
+
+        ds._handleEvent(eventData);
+    },
+
+    'will emit error if the status is error' : function (test) {
+        var ds = DataSift.create('testuser','apiKey');
+        var eventData = {};
+
+        test.expect(2);
+
+        ds.client.recover = function() {
             test.ok(true);
         };
 
-        ds._connect().then(function(r) {
-            test.notEqual(r, null);
-            server.close();
-            test.done();
-        }, function (err)  {
-            console.log(err);
-            test.ok(false);
-            server.close();
-            test.done();
-        }).end();
+        eventData.status = 'failure';
 
-    },
-
-    'rejects when end point refuses the connection' : function (test) {
-        test.expect(1);
-        var ds = DataSift.create('testuser', 'testapi', 'http://localhost/', 1336);
-        ds._connect().then(function(){
-            test.ok(false);
-            test.done();
-        }, function (err)  {
+        ds.on('error', function (err) {
             test.ok(true);
-            test.done();
-        }).end();
+        });
+        ds._handleEvent(eventData);
+        test.done();
     },
 
-    'rejects on socket timeout' : function (test) {
-        var url = 'http://www.datasift.com/'
-        var ds = DataSift.create('testuser','apiKey',url,80);
-        DataSift.SOCKET_TIMEOUT = 1;
+    'will emit warning if data json status is a warning' : function (test) {
+        var ds = DataSift.create('testuser','apiKey');
+        var eventData = {};
+        eventData.status = 'warning';
         test.expect(1);
-
-        ds._connect().then( function () {
-            test.ok(false);
-            test.done();
-        }, function (err) {
+        ds.on('warning', function (err) {
             test.ok(true);
             test.done();
         });
+        ds._handleEvent(eventData);
+
     },
 
-    'will resolve immediately if connection state is not disconnected' : function (test) {
-        var url = 'http://www.datasift.com/'
-        var ds = DataSift.create('testuser','apiKey',url,80);
-        ds.connectionState = 'connected';
+    'will emit delete if data is defined but delete flag is set' : function (test) {
+        var ds = DataSift.create('testuser','apiKey');
+        var eventData = {};
+        var data = {};
+        data.data = 'data'
+        data.deleted = true;
+        eventData.data = data;
+
         test.expect(1);
-        ds._connect().then(
-            function() {
-                test.ok(true);
-                test.done();
-            }
-        ).end();
+        ds.on('delete', function (err) {
+            test.ok(true);
+            test.done();
+        });
+        ds._handleEvent(eventData);
     },
 
-    'will reject on non-200 status code' : function(test) {
+    'will emit tick if json has a tick property' : function (test) {
+        var ds = DataSift.create('testuser','apiKey');
+        var eventData = {};
+        eventData.tick = true;
 
-        test.expect(4);
-
-        var server = http.createServer(function (req, res) {
-            req.setEncoding('utf-8');
-            req.on('data', function (data) {
-                test.equal(data, '\n');
-                res.writeHead(401)
-                res.end('{"status":"failure","message":"Invalid API key given"}');
-            });
-        }).listen(1333, '127.0.0.1');
-
-        var ds = DataSift.create('testuser', 'testapi', 'http://localhost/', 1333);
-
-        ds._calculateReconnectDelay = function(){
+        test.expect(1);
+        ds.on('tick', function () {
             test.ok(true);
-        };
-
-        ds._connect().then(function(r) {
-            server.close();
-            test.ok(false);
             test.done();
-        }, function (err)  {
+        });
+        ds._handleEvent(eventData);
+    },
 
-            server.close();
-            test.ok(true);
-            test.notEqual(err.indexOf('Invalid API key given'), -1);
+    'will emit unknownEvent on unrecognized events' : function (test) {
+
+        var url = 'http://datasifter.com/'
+        var ds = DataSift.create('testuser','apiKey');
+        var eventData = {unknown : 123};
+        test.expect(1);
+        ds.on('unknownEvent', function (jsonReceived) {
+            test.deepEqual(jsonReceived, eventData);
             test.done();
-        }).end();
+        });
+
+        ds._handleEvent(eventData);
+    },
+
+
+    'will clean up connection on disconnect from DataSift' : function (test) {
+        var url = 'http://datasifter.com/'
+        var ds = DataSift.create('testuser','apiKey');
+        var eventData = {};
+        ds.request = {};
+        test.expect(1);
+
+        eventData.status = 'failure';
+        eventData.message = 'A stop message was received. You will now be disconnected';
+
+        ds._handleEvent(eventData);
+        test.equal(ds.client, undefined);
+        test.done();
     }
 }
 
+exports['shutdown'] = {
+    'success' : function(test) {
+        var ds = DataSift.create('testuser','apiKey');
+
+        ds.client = {};
+        ds.client.write = function(contents) {
+            test.equal(contents, JSON.stringify({action: 'stop'}));
+        };
+
+        ds.client.stop = function() {
+            test.ok(true);
+            return Q.resolve();
+        }
+        test.expect(3);
+        ds.shutdown().then(
+            function(){
+                test.ok(true);
+                test.done();
+            },function(err){
+                test.ok(false);
+                test.done();
+            }
+        ).done();
+    }
+}
+
+exports['unsubscribe'] = {
+    'success' : function(test) {
+        var ds = DataSift.create('testuser','apiKey');
+
+        ds.client = {};
+        ds.client.write = function(contents) {
+            test.equal(contents, JSON.stringify({'action' : 'unsubscribe', 'hash' : 'abc123'}));
+        };
+
+        ds.unsubscribe('abc123').then(
+            function() {
+                test.ok(true);
+                test.done();
+            }, function(err) {
+                test.ok(false);
+                test.done();
+            }
+        ).done();
+    }
+}
 exports['onData'] = {
     'success' : function (test) {
         var ds = DataSift.create('a','b','c','d');
@@ -248,643 +428,12 @@ exports['onData'] = {
 }
 
 exports['onEnd'] = {
-    'will handle non-200 status codes' : function (test) {
-        var ds = DataSift.create('a','b','c','d');
-
-        ds.statusCode = 400;
-        ds.responseData = 'not found';
-        ds.connectionState = 'connected';
-        ds.on('warning', function(message){
-            test.ok(true);
-        });
-
-        ds._transitionTo = function(to) {
-            test.equal(to,'connected');
-        };
-
-        ds._onEnd();
-        test.expect(3);
-        test.done();
-    },
-
-    'will handle complete event data in the response buffer' : function (test) {
-        var ds = DataSift.create('a','b','c','d');
-
-        ds.statusCode = 200;
-        ds.responseData = '{"a" : 1}';
-        ds.connectionState = 'connected';
-        var testData = [];
-
-        ds.on('warning', function(message){
-            test.ok(true);
-        });
-
-        ds._transitionTo = function(to) {
-            test.equal(to,'connected');
-        };
-
-        ds._handleEvent = function(eventData) {
-            testData.push(eventData);
-        };
-
-        ds._onEnd();
-        test.deepEqual(testData, [{a:1}]);
-        test.expect(3);
-        test.done();
-    },
-
-    'will handle incomplete event data in the response buffer' : function (test) {
-        var ds = DataSift.create('a','b','c','d');
-
-        ds.statusCode = 200;
-        ds.responseData = 'no { t j son -';
-        ds.connectionState = 'connected';
-        ds.on('warning', function(message){
-            test.ok(true);
-        });
-
-        ds._transitionTo = function(to) {
-            test.equal(to,'connected');
-        };
-
-        ds._onEnd();
-        test.expect(3);
-        test.done();
-    },
-
-    'will not attempt to reconnect when status code is 404 or 401 (bad hash code or bad credentials)' : function(test) {
-        var ds = DataSift.create('a','b','c','d');
-
-        ds.on('warning', function(message){
-            test.ok(true);
-        });
-
-        test.expect(4);
-        ds.statusCode = 401;
-        ds._onEnd();
-        ds.statusCode = 404;
-        ds._onEnd();
-        test.done();
-    }
-}
-
-exports['establishConnection'] = {
     'success' : function(test) {
-        var ds = DataSift.create('testuser', 'apyKey');
-        var response = {};
-        test.expect(4);
-        response.on = function(eventName, callback) {
-            test.ok(true);
-        };
-
-        ds._subscribe = function(){
-            test.ok(true);
-            return Q.resolve();
-        };
-
-        ds._connect = function() {
-            test.ok(true);
-            return Q.resolve(response);
-        };
-        ds._establishConnection().then(
-            function() {
-               test.done()
-            }, function (err) {
-                console.log(err);
-                console.log(err.stack);
-                test.ok(false);
-                test.done();
-            }
-        ).end();
-    },
-
-    'will handle connect reject' : function (test) {
-        var ds = DataSift.create('testuser', 'apyKey');
-        test.expect(4);
-
-        ds._connect = function() {
-            test.ok(true);
-            ds.statusCode = 200;
-            return Q.reject();
-        };
-
-        ds._transitionTo = function(state){
-            test.ok(true);
-        };
-
-        ds._establishConnection().then(
-            function() {
-                test.ok(true);
-                test.equal(ds.connectionState, 'disconnected');
-                test.done();
-            }, function (err) {
-                test.ok(false);
-                test.done();
-            }
-        ).end();
-    },
-
-    'will handle connect reject with bad status code' : function(test) {
-        var ds = DataSift.create('testuser', 'apyKey');
-        test.expect(2);
-
-        ds._connect = function() {
-            test.ok(true);
-            ds.statusCode = 401;
-            return Q.reject();
-        };
-
-        ds._establishConnection().then(
-            function() {
-
-            }, function (err) {
-                test.ok(true);
-                test.done();
-            }
-        ).end();
-    },
-
-    'will handle a subscribe failure' : function(test) {
-        var ds = DataSift.create('a', 'b');
-        var request = {};
-        test.expect(6);
-
-        request.on = function(label,cb){
-            test.ok(true);
-        };
-
-        ds._subscribe = function(){
-            test.ok(true);
-            return Q.reject();
-        };
-        ds._disconnect = function(){
-            test.ok(true);
-        };
-
-        ds._connect = function() {
-            test.ok(true);
-            return Q.resolve(request);
-        };
-
-        ds._establishConnection().then(
-            function() {
-                test.ok(false);
-                test.done();
-            }, function(err) {
-                test.ok(true);
-                test.done();
-            }
-        ).end();
-    },
-
-    'will handle promise resolve when the state is other than disconnected' : function(test) {
-        var ds = DataSift.create('a','b');
-
-        ds.connectionState = 'connecting';
-
-        ds.on('warning', function(m){
-            test.ok(true);
-        });
-
-        test.expect(1);
-        ds._establishConnection().then(
-            function() {
-                test.done();
-            }, function(err) {
-                test.ok(true);
-                test.done();
-            }
-        ).end();
-    }
-
-}
-
-exports['subscribe'] = {
-    setUp: function (cb) {
-        DataSift.SUBSCRIBE_WAIT = 50;
-        cb();
-    },
-
-    tearDown : function (cb) {
-        DataSift.SUBSCRIBE_WAIT = 50;
-        cb();
-    },
-
-    'will subscribe to a stream' : function (test) {
-
-        var ds = DataSift.create('testuser', 'apyKey');
-        ds.hash = 'abc123';
-
-        ds.connectionState = 'connected';
-        ds.request = {};
-        ds.request.write = function (body, encoding){
-            test.equal(body,'{"action":"subscribe","hash":"abc123"}' );
-        };
-
-        ds._subscribe().then(
-            function(){
-                test.done();
-            }
-        ).end();
-        //test.done();
-    },
-
-    'will immediately resolve if connectionState is disconnected' : function(test) {
-        var ds = DataSift.create('testuser', 'apiKey');
-        ds.connectionState = 'disconnected';
-        ds.request = {};
-
-        ds.request.write = function () {
-            test.ok(false);
-        };
-
-        ds._subscribe().then(
-            function() {
-                test.done();
-            }
-        ).end();
-
-    },
-    'will reject a warning with invalid credentials is emitted' : function(test) {
-        var ds = DataSift.create('testuser', 'apiKey');
-        ds.hash = 'abc123';
-
-        ds.connectionState = 'connecting';
-        ds.request = {};
-
-        ds.request.write = function (body, encoding){
-            test.equal(body,'{"action":"subscribe","hash":"abc123"}' );
-        };
-
-        ds._subscribe().then(
-            function(){
-                test.ok(false);
-                test.done();
-            }, function(err){
-                test.notEqual(err.indexOf('abc123'), -1);
-                test.done();
-            }
-        )
-        ds.emit('warning', 'You did not send a valid hash to subscribe to')
-
-    }
-}
-
-exports['stop'] = {
-    'will unsubscribe and disconnect' : function (test) {
-
-        var url = 'http://datasifter.com/'
-        var ds = DataSift.create('testuser','apiKey',url,80);
-        ds.request = {};
-        ds.connectionState = 'connected';
-        test.expect(2);
-
-        ds._unsubscribe = function () {
-            test.ok(true);
-        };
-
-        ds._disconnect = function () {
-            test.ok(true);
-        };
-
-        ds.stop().then(function () {
-            test.done()
-        }).end();
-    },
-
-    'will resolve even if not connected' : function (test) {
-        var ds = DataSift.create('testuser', 'testapi');
-
-        test.expect(1);
-        ds.stop().then( function() {
-            test.ok(true);
-            test.done();
-        }).end();
-    }
-}
-
-exports['unsubscribe'] = {
-
-    'will unsubscribe from data sift servers' : function (test) {
-        var ds = DataSift.create('testuser', 'apyKey');
-        ds.hash = 'abc123';
-        ds.connectionState = 'connected';
-        test.expect(1);
-
-        ds.request = {}
-        ds.request.write = function (body, encoding){
-            test.equal(body,'{"action":"unsubscribe","hash":"abc123"}' );
-        };
-
-        ds._unsubscribe();
-        test.done();
-    },
-
-    'will immediately resolve if connectionState is not connected' : function(test) {
-        var ds = DataSift.create('testuser', 'apyKey');
-        ds.connectionState = 'disconnected';
-        ds.request = {};
-
-        ds.request.write = function () {
-            test.ok(false);
-        };
-
-        ds._unsubscribe();
-        test.done();
-    }
-}
-
-exports['disconnect'] = {
-    'will disconnect from the datasift servers' : function (test) {
-        var ds = DataSift.create('testuser', 'apyKey');
-
-        ds.connectionState = 'connected';
-        ds.request = {};
-        ds.request.write = function (body, encoding){
-            test.equal(body,'{"action":"stop"}' );
-        };
-
-        ds._disconnect();
-        test.done();
-    },
-
-    'will immediately resolve if connectionState is not connected' : function(test) {
-        var ds = DataSift.create('testuser', 'apyKey');
-        ds.connectionState = 'disconnected';
-        ds.request = {};
-
-        ds.request.write = function () {
-            test.ok(false);
-        };
-
-        ds._disconnect();
-        test.done();
-    }
-}
-
-exports['handleEvent'] = {
-    'success' : function (test) {
-        var url = 'http://datasifter.com/'
-        var ds = DataSift.create('testuser','apiKey',url,80);
-        var interactionData = {'test' : 'abc', 'name' : 'jon', 'number' : 1};
-        var eventData = { 'hash': '123' , 'data' : {'interaction': interactionData}};
-        test.expect(1);
-        ds.on('interaction', function (eventReceived) {
-            test.deepEqual(eventReceived, eventData);
-            test.done();
-        });
-
-        ds._handleEvent(eventData);
-    },
-
-    'will emit error if the status is error' : function (test) {
-        var url = 'http://datasifter.com/'
-        var ds = DataSift.create('testuser','apiKey',url,80);
-        var eventData = {};
-        ds.request = {};
-        test.expect(2);
-
-        ds._transitionTo = function(stateTo) {
-            test.equal(stateTo, 'connected');
-        };
-
-        eventData.status = 'failure';
-
-        ds.on('error', function (err) {
-            test.ok(true);
-        });
-        ds._handleEvent(eventData);
-        test.done();
-    },
-
-    'will emit warning if data json status is a warning' : function (test) {
-        var url = 'http://datasifter.com/'
-        var ds = DataSift.create('testuser','apiKey',url,80);
-        var eventData = {};
-        eventData.status = 'warning';
-        test.expect(1);
-        ds.on('warning', function (err) {
-            test.ok(true);
-            test.done();
-        });
-        ds._handleEvent(eventData);
-
-    },
-
-    'will emit delete if data is defined but delete flag is set' : function (test) {
-        var url = 'http://datasifter.com/'
-        var ds = DataSift.create('testuser','apiKey',url,80);
-        var eventData = {};
-        var data = {};
-        data.data = 'data'
-        data.deleted = true;
-        eventData.data = data;
-
-        test.expect(1);
-        ds.on('delete', function (err) {
-            test.ok(true);
-            test.done();
-        });
-        ds._handleEvent(eventData);
-    },
-
-    'will emit tick if json has a tick property' : function (test) {
-        var url = 'http://datasifter.com/'
-        var ds = DataSift.create('testuser','apiKey',url,80);
-        var eventData = {};
-        eventData.tick = true;
-
-        test.expect(1);
-        ds.on('tick', function () {
-            test.ok(true);
-            test.done();
-        });
-        ds._handleEvent(eventData);
-    },
-
-    'will emit unknownEvent on unrecognized events' : function (test) {
-
-        var url = 'http://datasifter.com/'
-        var ds = DataSift.create('testuser','apiKey',url,80);
-        var eventData = {unknown : 123};
-        test.expect(1);
-        ds.on('unknownEvent', function (jsonReceived) {
-            test.deepEqual(jsonReceived, eventData);
-            test.done();
-        });
-
-        ds._handleEvent(eventData);
-    },
-
-
-    'will clean up connection on disconnect from DataSift' : function (test) {
-        var url = 'http://datasifter.com/'
-        var ds = DataSift.create('testuser','apiKey',url,80);
-        var eventData = {};
-        ds.request = {};
-        test.expect(1);
-
-        eventData.status = 'failure';
-        eventData.message = 'A stop message was received. You will now be disconnected';
-
-        ds._transitionTo = function (to) {
-            test.equal(to, 'disconnected');
-        };
-
-        ds._handleEvent(eventData);
-        test.done();
-    }
-}
-
-exports['calculateReconnectionDelay'] = {
-    'will calculate reconnect timer' : function(test) {
-        var ds = DataSift.create('testuser', 'testapi');
-
-        test.equal(ds._calculateReconnectDelay(), 0);
-        test.equal(ds.reconnectAttempts, 1);
-
-        test.equal(ds._calculateReconnectDelay(), 10000);
-        test.equal(ds.reconnectAttempts, 2);
-
-        ds.reconnectAttempts = 3
-        test.equal(ds._calculateReconnectDelay(), 40000);
-
-        ds.reconnectAttempts = 1000;
-        test.equal(ds._calculateReconnectDelay(), 320000);
-
-        test.done();
-    }
-}
-
-exports['transitionTo'] = {
-
-    setUp: function (cb) {
-        this.ds = DataSift.create('a','b','c','d');
-        cb();
-    },
-
-    'will transition to disconnected from connected' : function (test) {
-        this.ds.connectionState = 'connected';
-        test.expect(4);
-        this.ds._unsubscribe = function (){
-            test.ok(true);
-        };
-
-        this.ds._disconnect = function() {
-            test.ok(true);
-        };
-
-        this.ds._transitionTo('disconnected');
-        test.equal(this.ds.request, null);
-        test.equal(this.ds.connectionState, 'disconnected');
-
-        test.done();
-    },
-
-    'will transition to disconnected from connecting' : function (test) {
-        this.ds.connectionState = 'connecting';
-        test.expect(3);
-
-        this.ds._disconnect = function() {
-            test.ok(true);
-        };
-
-        this.ds._transitionTo('disconnected');
-        test.equal(this.ds.request, null);
-        test.equal(this.ds.connectionState, 'disconnected');
-
-        test.done();
-
-    },
-
-    'will transition to disconnected from disconnected' : function (test) {
-        this.ds.connectionState = 'disconnected';
-        this.ds._transitionTo('disconnected');
-        test.equal(this.ds.request, null);
-        test.equal(this.ds.connectionState, 'disconnected');
-        test.done();
-    },
-
-    'will transition to connected from connecting' : function (test) {
-        test.expect(3);
-        this.ds.connectionState = 'connecting';
-        this.ds._subscribe = function() {
-            test.ok(true);
-            return Q.resolve();
-        };
-
-        this.ds.on('connect', function(){
-            test.ok(true);
-        });
-        var self = this;
-        this.ds._transitionTo('connected').then(
-            function(){
-                test.equal(self.ds.connectionState, 'connected');
-                test.done();
-            }
-        ).end();
-    },
-
-    'will handle a transition to connected form a non connecting state' : function (test) {
-        this.ds.connectionState = 'connected';
-        this.ds._establishConnection = function () {
-            test.ok(true);
-        };
-        this.ds._transitionTo('connected');
-        test.expect(1);
-        test.done();
-    },
-
-    'will transition to connecting from a disconnected state' : function (test) {
-        this.ds.connectionState = 'disconnected';
-
-        test.expect(2);
-
-        this.ds._establishConnection = function () {
-            test.ok(true);
-            self.ds.connectionState = 'connecting';
-            return Q.resolve();
-        };
-
-        var self = this;
-        this.ds._transitionTo('connecting').then(
-            function(){
-                test.equal(self.ds.connectionState, 'connecting');
-                test.done();
-            }, function (err) {
-                console.log(err.stack);
-                console.log(err);
-                test.ok(false);
-                test.done();
-            }
-        ).end();
-    },
-
-    'will handle transition to an error state' : function (test) {
-        test.expect(1);
-
-        this.ds._establishConnection = function () {
-            test.ok(true);
-            return Q.resolve();
-        };
-
-        this.ds._transitionTo('error');
-        test.done();
-    },
-
-    'will handle transitions to connecting and not be in a disconnected state' : function (test) {
-        this.ds.connectionState = 'connected';
-        var self = this;
-        test.expect(2);
-
-        this.ds._establishConnection = function () {
-            test.ok(true);
-            self.ds.connectionState = 'connecting';
-            return Q.resolve();
-        };
-
-        this.ds._transitionTo('connecting');
-        test.equal(self.ds.connectionState, 'connecting');
+        var ds = DataSift.create('a','b','c','d');
+        ds.responseData = 'i have stuff';
+
+        ds._onEnd();
+        test.equal(ds.responseData, '');
         test.done();
     }
 }

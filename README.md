@@ -19,19 +19,29 @@ Factory method which returns a DataSift instance
 
     //Create a datasift instance via the factory method like:
     var ds = DataSift.create('YOUR_ACCOUNT', 'YOUR_API_KEY');
-###start(streamHash)
+###subscribe(streamHash)
 Starts listening to the specific stream hash given, returning a completion promise.
+Multiple streams can be subscribed to per DataSift instance.
     
-    ds.start('YOUR_STREAM_HASH').then(
+    ds.subscribe('YOUR_STREAM_HASH').then(
         function() {
             //successful start
         }, function(err) {
             //error starting the listener
         });
-###stop()
+###unsubscribe(streamHash)
+Unsubscribes to a stream already subscribed by the underlying connection to DataSift
+
+    ds.unsubscribe('YOUR_STREAM_HASH').then(
+        function() {
+            //successfully unsubscribed
+        }, function() {
+            //failed to unsubscribe
+        });
+###shutdown()
 Stop and disconnects to the DataSift stream.
 
-    ds.stop();
+    ds.shutdown();
 ###Putting it all together
 See also the example.js file.
 
@@ -40,9 +50,13 @@ See also the example.js file.
     // create a datasift instance via the factory method
     var ds = DataSift.create('YOUR_ACCOUNT', 'YOUR_API_KEY');
 
+    ds.on('interaction', function (message) {
+        //process the message;
+    });
+
     // start listening to the stream:
 
-    ds.start('YOUR_STREAM_HASH').then(
+    ds.subscribe('YOUR_STREAM_HASH').then(
         function () {
             console.log("Connected to DataSift");
         },
@@ -51,9 +65,6 @@ See also the example.js file.
         }
     );
 
-    ds.on('interaction', function (message) {
-        //process the message;
-    });
 
 ## events emitted
 ###interaction(data)
