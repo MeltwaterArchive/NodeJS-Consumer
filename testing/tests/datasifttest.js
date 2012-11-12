@@ -56,7 +56,7 @@ exports['subscribe'] = {
 
         ds.subscribe('abc123').then(
             function() {
-                test.ok(true);
+                test.equal(ds.hashes.length, 1);
                 test.done();
             }, function(err) {
                 test.ok(false);
@@ -213,6 +213,56 @@ exports['start'] = {
 
         ds._start();
         ds.client.emit('end', 401);
+    },
+
+    'will call resubscribe when a recovered event is emitted by the client' : function(test) {
+        var ds = DataSift.create('testuser', 'apiKey');
+        ds.client.start = function() {
+            return Q.resolve();
+        };
+
+        ds._resubscribe = function() {
+            test.ok(true);
+            test.done();
+        };
+
+        ds._start();
+        ds.client.emit('recovered');
+    }
+}
+
+exports['resubscribe'] = {
+    'success' : function(test) {
+        var ds = DataSift.create('testuser', 'apiKey');
+
+        ds.hashes.set('123', null);
+        ds.hashes.set('456', null);
+        ds.hashes.set('abc', null);
+
+        ds._subscribeToStream = function(hash) {
+            test.ok(true);
+            return Q.resolve();
+        };
+        test.expect(3);
+        ds._resubscribe();
+        test.done();
+    },
+
+    'will handle subscribe rejects' : function(test) {
+        var ds = DataSift.create('testuser', 'apiKey');
+
+        ds.hashes.set('123', null);
+        ds.hashes.set('456', null);
+        ds.hashes.set('abc', null);
+
+        ds._subscribeToStream = function(hash) {
+            test.ok(true);
+            return Q.reject();
+        };
+
+        test.expect(3);
+        ds._resubscribe();
+        test.done();
     }
 }
 
@@ -356,10 +406,10 @@ exports['unsubscribe'] = {
         ds.client.write = function(contents) {
             test.equal(contents, JSON.stringify({'action' : 'unsubscribe', 'hash' : 'abc123'}));
         };
-
+        ds.hashes.set('abc123', 'test123');
         ds.unsubscribe('abc123').then(
             function() {
-                test.ok(true);
+                test.equal(ds.hashes.length, 0);
                 test.done();
             }, function(err) {
                 test.ok(false);

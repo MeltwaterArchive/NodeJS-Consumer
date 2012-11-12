@@ -5,9 +5,10 @@
  */
 
 "use strict"
-var Persistent = require('tenaciousHttp');
+var Persistent = require('tenacioushttp');
 var EventEmitter = require('events').EventEmitter;
 var Q = require('q');
+var QHash = require('hashtable').QHash;
 
 var __ = function() {
 
@@ -48,6 +49,7 @@ __.create = function(login, apiKey){
     instance.client = Persistent.create('http://stream.datasift.com/', 80, header,init.bind(instance));
     instance.responseData = '';
     instance.attachedListeners = false;
+    instance.hashes = new QHash();
     return instance;
 }
 
@@ -66,6 +68,7 @@ __.prototype.subscribe = function(hash) {
         function() {
             self._subscribeToStream(hash).then(
                 function() {
+                    self.hashes.set(hash, null);
                     d.resolve();
                 }, function(err) {
                     self.shutdown().then(
@@ -116,6 +119,7 @@ __.prototype._subscribeToStream = function(hash) {
 __.prototype.unsubscribe = function(hash) {
     var body = JSON.stringify({'action' : 'unsubscribe', 'hash' : hash});
     this.client.write(body, 'utf-8');
+    this.hashes.remove(hash);
     return Q.resolve();  //todo fix this up
 };
 
@@ -132,7 +136,15 @@ __.prototype._start = function() {
         });
 
         this.client.on('end', function(statusCode){
+            console.log('end event received with status code', statusCode);
             self._onEnd(statusCode);
+        });
+
+        this.client.on('recovered', function(reason) {
+            console.log('recovered', reason);
+            if(reason !== 'server end') {//skip server ends because we do not want to double subscribe.
+                self._resubscribe();
+            }
         });
         this.attachedListeners = true;
     }
@@ -140,12 +152,25 @@ __.prototype._start = function() {
     return this.client.start();
 };
 
+__.prototype._resubscribe = function(){
+    var self = this;
+    this.hashes.forEach(function(key,v){ //key = datasift hash
+        self._subscribeToStream(key).then(
+            function(){
+                self.emit('debug', 'reconnected to stream hash ' + key);
+            }, function(err) {
+                self.emit('debug', 'failed to reconnect to stream hash ' + key + " with error: " + err);
+            }
+        );
+    });
+};
 /**
  * shuts down the existing datasift stream
  * @return {Promise}
  */
 __.prototype.shutdown = function () {
     this.attachedListeners = false;
+    this.hashes = new QHash();
     this.client.write(JSON.stringify({'action' : 'stop'}));
     return this.client.stop();
 };

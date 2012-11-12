@@ -13,6 +13,7 @@
         "q": "",
         "winston":"",
         "nock":"",
-        "tenacious":"git://github.com/LocalResponse/tenacious.git"
+        "tenacious":"git://github.com/LocalResponse/tenacious.git",
+        "hashtable":""
     }
 }
