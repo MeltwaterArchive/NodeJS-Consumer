@@ -8,14 +8,14 @@
 var Persistent = require('tenacioushttp');
 var EventEmitter = require('events').EventEmitter;
 var Q = require('q');
-var QHash = require('hashtable').QHash;
+var Hash = require('hashtable').QHash;
 
 var __ = function() {
 
 };
 
 __.SUBSCRIBE_WAIT = 750;
-
+__.INTERACTION_TIMEOUT = 300000;
 /**
  * creates an instance of the datasift driver
  * @param login
@@ -49,7 +49,7 @@ __.create = function(login, apiKey){
     instance.client = Persistent.create('http://stream.datasift.com/', 80, header,init.bind(instance));
     instance.responseData = '';
     instance.attachedListeners = false;
-    instance.hashes = new QHash();
+    instance.hashes = new Hash();
     return instance;
 }
 
@@ -152,6 +152,10 @@ __.prototype._start = function() {
     return this.client.start();
 };
 
+/**
+ * sends subscribe messages to datasift based on streams already subscribed to by this instance
+ * @private
+ */
 __.prototype._resubscribe = function(){
     var self = this;
     this.hashes.forEach(function(key,v){ //key = datasift hash
@@ -164,13 +168,14 @@ __.prototype._resubscribe = function(){
         );
     });
 };
+
 /**
  * shuts down the existing datasift stream
  * @return {Promise}
  */
 __.prototype.shutdown = function () {
     this.attachedListeners = false;
-    this.hashes = new QHash();
+    this.hashes = new Hash();
     this.client.write(JSON.stringify({'action' : 'stop'}));
     return this.client.stop();
 };
@@ -210,7 +215,7 @@ __.prototype._onData = function(chunk, statusCode) {
  * @private
  */
 __.prototype._onEnd = function(statusCode) {
-    //underlying driver is "recovering"
+    //underlying connection is "recovering"
     this.responseData = '';
 };
 
@@ -224,7 +229,7 @@ __.prototype._handleEvent = function (eventData) {
         if(eventData.message !== 'A stop message was received. You will now be disconnected') {
             this.emit('error', new Error(eventData.message));
             this.client.recover();
-        } else { //means _disconnect was called
+        } else { //means shutdown was called.
             this.client = undefined;
         }
     } else if (eventData.status === 'success' || eventData.status === 'warning' ) {
@@ -234,10 +239,29 @@ __.prototype._handleEvent = function (eventData) {
     } else if (eventData.tick !== undefined) {
         this.emit('tick', eventData);
     } else if (eventData.data !== undefined && eventData.data.interaction !== undefined) {
+        clearTimeout(this.interactionTimeout);
+        this.interactionTimeout = setTimeout(this._recycle, __.INTERACTION_TIMEOUT);
         this.emit('interaction', eventData);
     } else {
         this.emit('unknownEvent', eventData);
     }
 };
 
+/**
+ * recycles the connection.  used when the driver is in an unrecoverable state.  a new underlying socket will be assigned
+ * @return {Promise}
+ * @private
+ */
+__.prototype._recycle = function(){
+    var self = this;
+    this.emit('debug', 'recycling connection');
+    return this.client.stop().then(this.client.recover).then(
+        function(){
+            self._resubscribe();
+        }, function(err){
+            self.emit('error', 'failed to reconnect: ' + err);
+            return Q.reject(err);
+        }
+    );
+};
 module.exports = __;

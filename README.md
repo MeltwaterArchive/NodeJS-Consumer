@@ -83,3 +83,5 @@ See also the example.js file.
     Error coming from the DataSift stream.
 ####unknownEvent(data)
     An event coming from DataSift which its status cannot be determined.
+###debug(message)
+    Information relating the transition in state of the driver.  Used for debugging purposes.

@@ -16,7 +16,6 @@ exports['create'] = {
 
         test.equal(ds.login, 'login');
         test.equal(ds.apiKey, 'apiKey');
-
         test.done();
     },
 
@@ -56,7 +55,7 @@ exports['subscribe'] = {
 
         ds.subscribe('abc123').then(
             function() {
-                test.equal(ds.hashes.length, 1);
+                test.equal(ds.hashes.get('abc123'), null);
                 test.done();
             }, function(err) {
                 test.ok(false);
@@ -267,17 +266,26 @@ exports['resubscribe'] = {
 }
 
 exports['handleEvent'] = {
+
+    setUp : function(cb){
+        this.ds = DataSift.create('testuser', 'apiKey');
+        cb();
+    },
+    tearDown : function(cb){
+        clearTimeout(this.ds.interactionTimeout);
+        cb();
+    },
     'success' : function (test) {
-        var ds = DataSift.create('testuser','apiKey');
+        //var ds = DataSift.create('testuser','apiKey');
         var interactionData = {'test' : 'abc', 'name' : 'jon', 'number' : 1};
         var eventData = { 'hash': '123' , 'data' : {'interaction': interactionData}};
         test.expect(1);
-        ds.on('interaction', function (eventReceived) {
+        this.ds.on('interaction', function (eventReceived) {
             test.deepEqual(eventReceived, eventData);
             test.done();
         });
 
-        ds._handleEvent(eventData);
+        this.ds._handleEvent(eventData);
     },
 
     'will emit error if the status is error' : function (test) {
@@ -369,6 +377,12 @@ exports['handleEvent'] = {
         ds._handleEvent(eventData);
         test.equal(ds.client, undefined);
         test.done();
+    },
+
+    'will call recycle if no interactions are processed over a long period of time' : function(test){
+
+        //todo: implement this
+        test.done();
     }
 }
 
@@ -384,7 +398,8 @@ exports['shutdown'] = {
         ds.client.stop = function() {
             test.ok(true);
             return Q.resolve();
-        }
+        };
+
         test.expect(3);
         ds.shutdown().then(
             function(){
@@ -486,4 +501,63 @@ exports['onEnd'] = {
         test.equal(ds.responseData, '');
         test.done();
     }
+}
+
+exports['recycle'] = {
+    'success' : function(test) {
+        var ds = DataSift.create('test', 'api');
+
+        ds.client = {};
+        ds.client.stop = function() {
+            test.ok(true);
+            return Q.resolve();
+        };
+
+        ds.client.recover = function() {
+            test.ok(true);
+            return Q.resolve();
+        };
+
+        ds._resubscribe = function() {
+            test.ok(true);
+        };
+
+        test.expect(4);
+        ds._recycle().then(
+            function() {
+                test.ok(true);
+                test.done();
+            }, function(err) {
+                console.log(err);
+                test.ok(false);
+                test.done();
+            }
+        ).done();
+    },
+
+    'will emit error on failed connection recycle' : function(test) {
+            var ds = DataSift.create('test', 'api');
+
+            ds.client = {};
+            ds.client.stop = function() {
+                test.ok(true);
+                return Q.reject();
+            };
+
+            ds.on('error', function(error){
+                test.ok(true);
+            });
+
+            test.expect(3);
+            ds._recycle().then(
+                function() {
+                    test.ok(false);
+                    test.done();
+                }, function(err) {
+                    test.ok(true);
+                    test.done();
+                }
+            ).done();
+    }
+
 }
