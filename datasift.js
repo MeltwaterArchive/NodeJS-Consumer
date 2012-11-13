@@ -5,7 +5,7 @@
  */
 
 "use strict"
-var Persistent = require('tenacioushttp');
+var Persistent = require('tenacious-http');
 var EventEmitter = require('events').EventEmitter;
 var Q = require('q');
 var Hash = require('hashtable').QHash;

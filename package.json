@@ -13,7 +13,7 @@
         "q": "",
         "winston":"",
         "nock":"",
-        "tenacioushttp":"",
+        "tenacious-http":"",
         "hashtable":""
     }
 }
