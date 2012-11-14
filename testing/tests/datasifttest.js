@@ -466,7 +466,6 @@ exports['onData'] = {
 
     },
 
-
     'will put partial data chunks together' : function(test) {
         var ds = DataSift.create('a','b','c','d');
         var testData = [];
@@ -559,5 +558,4 @@ exports['recycle'] = {
                 }
             ).done();
     }
-
 }

@@ -248,13 +248,14 @@ __.prototype._handleEvent = function (eventData) {
 };
 
 /**
- * recycles the connection.  used when the driver is in an unrecoverable state.  a new underlying socket will be assigned
+ * recycles the connection.  used when the driver is in an unrecoverable state.  a new underlying socket will be assigned.
  * @return {Promise}
  * @private
  */
 __.prototype._recycle = function(){
     var self = this;
     this.emit('debug', 'recycling connection');
+    //needs more debugging information
     return this.client.stop().then(this.client.recover).then(
         function(){
             self._resubscribe();
