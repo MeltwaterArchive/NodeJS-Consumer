@@ -16,6 +16,7 @@ var __ = function() {
 
 __.SUBSCRIBE_WAIT = 750;
 __.INTERACTION_TIMEOUT = 300000;
+
 /**
  * creates an instance of the datasift driver
  * @param login
@@ -256,6 +257,7 @@ __.prototype._recycle = function(){
     var self = this;
     this.emit('debug', 'recycling connection');
     //needs more debugging information
+    this.attachedListeners = false;
     return this.client.stop().then(this.client.recover).then(
         function(){
             self._resubscribe();
