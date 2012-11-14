@@ -182,7 +182,7 @@ __.prototype.shutdown = function () {
 };
 
 /**
- * onData callback which handles the data stream coming form datasift.
+ * onData callback which handles the data stream coming from the datasift streams.
  * @param chunk
  * @param statusCode
  * @private
@@ -257,7 +257,6 @@ __.prototype._recycle = function(){
     var self = this;
     this.emit('debug', 'recycling connection');
     //needs more debugging information
-    this.attachedListeners = false;
     return this.client.stop().then(this.client.recover).then(
         function(){
             self._resubscribe();
