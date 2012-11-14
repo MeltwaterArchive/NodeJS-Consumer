@@ -269,10 +269,12 @@ exports['handleEvent'] = {
 
     setUp : function(cb){
         this.ds = DataSift.create('testuser', 'apiKey');
+        DataSift.INTERACTION_TIMEOUT = 30;
         cb();
     },
     tearDown : function(cb){
         clearTimeout(this.ds.interactionTimeout);
+        DataSift.INTERACTION_TIMEOUT = 300000;
         cb();
     },
     'success' : function (test) {
@@ -365,7 +367,6 @@ exports['handleEvent'] = {
 
 
     'will clean up connection on disconnect from DataSift' : function (test) {
-        var url = 'http://datasifter.com/'
         var ds = DataSift.create('testuser','apiKey');
         var eventData = {};
         ds.request = {};
@@ -380,9 +381,23 @@ exports['handleEvent'] = {
     },
 
     'will call recycle if no interactions are processed over a long period of time' : function(test){
+        //var ds = DataSift.create('testuser','apiKey');
 
-        //todo: implement this
-        test.done();
+        var interactionData = {'test' : 'abc', 'name' : 'jon', 'number' : 1};
+        var eventData = { 'hash': '123' , 'data' : {'interaction': interactionData}};
+
+        test.expect(2);
+        this.ds.on('interaction', function(data) {
+            test.ok(true);
+        });
+
+        this.ds._recycle = function(){
+            test.ok(true);
+            test.done();
+        };
+
+        this.ds._handleEvent(eventData);
+
     }
 }
 
