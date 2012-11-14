@@ -11,6 +11,7 @@
     ],
     "dependencies": {
         "q": "",
-        "winston":""
+        "tenacious-http":"",
+        "hashtable":""
     }
 }
