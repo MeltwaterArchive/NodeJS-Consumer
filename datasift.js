@@ -227,6 +227,7 @@ __.prototype._onEnd = function(statusCode) {
  * @private
  */
 __.prototype._handleEvent = function (eventData) {
+    var self = this;
     if (eventData.status === 'failure') {
         if(eventData.message !== 'A stop message was received. You will now be disconnected') {
             this.emit('error', new Error(eventData.message));
@@ -242,7 +243,9 @@ __.prototype._handleEvent = function (eventData) {
         this.emit('tick', eventData);
     } else if (eventData.data !== undefined && eventData.data.interaction !== undefined) {
         clearTimeout(this.interactionTimeout);
-        this.interactionTimeout = setTimeout(this._recycle, __.INTERACTION_TIMEOUT);
+        this.interactionTimeout = setTimeout(function(){
+            self._recycle.bind(self)();
+        }, __.INTERACTION_TIMEOUT);
         this.emit('interaction', eventData);
     } else {
         this.emit('unknownEvent', eventData);

@@ -385,6 +385,7 @@ exports['handleEvent'] = {
 
         var interactionData = {'test' : 'abc', 'name' : 'jon', 'number' : 1};
         var eventData = { 'hash': '123' , 'data' : {'interaction': interactionData}};
+        var self = this;
 
         test.expect(2);
         this.ds.on('interaction', function(data) {
@@ -392,12 +393,11 @@ exports['handleEvent'] = {
         });
 
         this.ds._recycle = function(){
-            test.ok(true);
+            test.notEqual(self.ds.client, undefined);
             test.done();
         };
 
         this.ds._handleEvent(eventData);
-
     }
 }
 
