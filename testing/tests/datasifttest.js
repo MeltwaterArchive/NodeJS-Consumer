@@ -55,7 +55,7 @@ exports['subscribe'] = {
 
         ds.subscribe('abc123').then(
             function() {
-                test.equal(ds.hashes.get('abc123'), null);
+                test.equal(ds.streams.get('abc123'), null);
                 test.done();
             }, function(err) {
                 test.ok(false);
@@ -234,9 +234,9 @@ exports['resubscribe'] = {
     'success' : function(test) {
         var ds = DataSift.create('testuser', 'apiKey');
 
-        ds.hashes.set('123', null);
-        ds.hashes.set('456', null);
-        ds.hashes.set('abc', null);
+        ds.streams.set('123', null);
+        ds.streams.set('456', null);
+        ds.streams.set('abc', null);
 
         ds._subscribeToStream = function(hash) {
             test.ok(true);
@@ -250,9 +250,9 @@ exports['resubscribe'] = {
     'will handle subscribe rejects' : function(test) {
         var ds = DataSift.create('testuser', 'apiKey');
 
-        ds.hashes.set('123', null);
-        ds.hashes.set('456', null);
-        ds.hashes.set('abc', null);
+        ds.streams.set('123', null);
+        ds.streams.set('456', null);
+        ds.streams.set('abc', null);
 
         ds._subscribeToStream = function(hash) {
             test.ok(true);
@@ -436,10 +436,10 @@ exports['unsubscribe'] = {
         ds.client.write = function(contents) {
             test.equal(contents, JSON.stringify({'action' : 'unsubscribe', 'hash' : 'abc123'}));
         };
-        ds.hashes.set('abc123', 'test123');
+        ds.streams.set('abc123', 'test123');
         ds.unsubscribe('abc123').then(
             function() {
-                test.equal(ds.hashes.length, 0);
+                test.equal(ds.streams.length, 0);
                 test.done();
             }, function(err) {
                 test.ok(false);

@@ -51,7 +51,7 @@ __.create = function(login, apiKey){
     instance.client = Persistent.create('http://stream.datasift.com/', 80, header,init.bind(instance));
     instance.responseData = '';
     instance.attachedListeners = false;
-    instance.hashes = new Hash();
+    instance.streams = new Hash();
     return instance;
 }
 
@@ -74,7 +74,7 @@ __.prototype.subscribe = function(hash) {
         }
     ).then(
         function(){
-            self.hashes.set(hash, null);
+            self.streams.set(hash, null);
             d.resolve();
         }, function(err) {
             self.shutdown().then(
@@ -121,7 +121,7 @@ __.prototype._subscribeToStream = function(hash) {
 __.prototype.unsubscribe = function(hash) {
     var body = JSON.stringify({'action' : 'unsubscribe', 'hash' : hash});
     this.client.write(body, 'utf-8');
-    this.hashes.remove(hash);
+    this.streams.remove(hash);
     return Q.resolve();
 };
 
@@ -160,7 +160,7 @@ __.prototype._start = function() {
  */
 __.prototype._resubscribe = function(){
     var self = this;
-    this.hashes.forEach(function(key,v){ //key = datasift hash
+    this.streams.forEach(function(key,v){ //key = datasift hash
         self._subscribeToStream(key).then(
             function(){
                 self.emit('debug', 'reconnected to stream hash ' + key);
@@ -177,7 +177,7 @@ __.prototype._resubscribe = function(){
  */
 __.prototype.shutdown = function () {
     this.attachedListeners = false;
-    this.hashes = new Hash();
+    this.streams = new Hash();
     this.client.write(JSON.stringify({'action' : 'stop'}));
     return this.client.stop();
 };
