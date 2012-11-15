@@ -5,6 +5,7 @@
  */
 
 "use strict"
+
 var Persistent = require('tenacious-http');
 var EventEmitter = require('events').EventEmitter;
 var Q = require('q');
@@ -67,20 +68,20 @@ __.prototype.subscribe = function(hash) {
 
     this._start().then(
         function() {
-            self._subscribeToStream(hash).then(
-                function() {
-                    self.hashes.set(hash, null);
-                    d.resolve();
-                }, function(err) {
-                    self.shutdown().then(
-                        function(){
-                            d.reject(err);
-                        }
-                    );
+            return self._subscribeToStream(hash);
+        }, function(err){
+            d.reject(err);
+        }
+    ).then(
+        function(){
+            self.hashes.set(hash, null);
+            d.resolve();
+        }, function(err) {
+            self.shutdown().then(
+                function(){
+                    d.reject(err);
                 }
             );
-        }, function(err) {
-            d.reject(err);
         }
     );
     return d.promise;
@@ -121,7 +122,7 @@ __.prototype.unsubscribe = function(hash) {
     var body = JSON.stringify({'action' : 'unsubscribe', 'hash' : hash});
     this.client.write(body, 'utf-8');
     this.hashes.remove(hash);
-    return Q.resolve();  //todo fix this up
+    return Q.resolve();
 };
 
 /**
@@ -137,12 +138,12 @@ __.prototype._start = function() {
         });
 
         this.client.on('end', function(statusCode){
-            console.log('end event received with status code', statusCode);
+            self.emit('debug','end event received with status code ' + statusCode);
             self._onEnd(statusCode);
         });
 
         this.client.on('recovered', function(reason) {
-            console.log('recovered', reason);
+            self.emit('debug', 'recovered from ' + reason);
             if(reason !== 'server end') {//skip server ends because we do not want to double subscribe.
                 self._resubscribe();
             }
@@ -256,7 +257,7 @@ __.prototype._handleEvent = function (eventData) {
 __.prototype._recycle = function(){
     var self = this;
     this.emit('debug', 'recycling connection');
-    //needs more debugging information
+
     return this.client.stop().then(this.client.recover).then(
         function(){
             self._resubscribe();
@@ -266,4 +267,5 @@ __.prototype._recycle = function(){
         }
     );
 };
+
 module.exports = __;
