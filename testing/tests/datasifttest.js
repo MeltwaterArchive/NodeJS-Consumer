@@ -130,10 +130,15 @@ exports['subscribeToStream'] = {
         ds.client = {};
         ds.client.write = function (body, encoding){
             test.equal(body,'{"action":"subscribe","hash":"abc123"}' );
+
         };
 
         ds._subscribeToStream('abc123').then(
             function(){
+                test.ok(!ds.pendingSubscribes.hasOwnProperty('abc123'));
+                test.done();
+            }, function(err) {
+                test.ok(false);
                 test.done();
             }
         ).done();
@@ -154,12 +159,45 @@ exports['subscribeToStream'] = {
                 test.ok(false);
                 test.done();
             }, function(err){
-                test.notEqual(err.indexOf('abc123'), -1);
+                test.equal(err,'improperly formatted stream hash');
                 test.done();
             }
         )
-        ds.emit('warning', 'You did not send a valid hash to subscribe to')
+        ds.emit('warning', 'You did not send a valid hash to subscribe to');
+    },
 
+    'will reject on non-existent stream' : function(test) {
+        var ds = DataSift.create('testuser', 'apiKey');
+
+        ds.client = {};
+
+        ds.client.write = function (body, encoding){
+            test.equal(body,'{"action":"subscribe","hash":"abc123"}' );
+        };
+
+        ds._subscribeToStream('abc123').then(
+            function(){
+                test.ok(false);
+                test.done();
+            }, function(err){
+                test.ok(!ds.pendingSubscribes.hasOwnProperty('abc123'));
+                test.equal(err,"The hash abc123 doesn't exist");
+                test.done();
+            }
+        )
+        ds.emit('warning', "The hash abc123 doesn't exist");
+    },
+
+    'will return existing promise if attempting to subscribe already pending' : function(test) {
+        var ds = DataSift.create('testuser', 'apyKey');
+        var mockedPromise = {};
+        ds.pendingSubscribes['abc123'] = {promise : mockedPromise};
+        test.equal(mockedPromise, ds._subscribeToStream('abc123'));
+        test.done();
+    },
+
+    'will not subscribe to warning twice' : function(test) {
+        test.done();
     }
 }
 

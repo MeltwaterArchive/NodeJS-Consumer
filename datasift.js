@@ -12,7 +12,7 @@ var Q = require('q');
 var Hash = require('hashtable').QHash;
 
 var __ = function() {
-
+    EventEmitter.call(this);
 };
 
 __.SUBSCRIBE_WAIT = 750;
@@ -48,6 +48,13 @@ __.create = function(login, apiKey){
     var init = function() {
         this.client.write('\n');
     };
+    instance.subscribeListener = false;
+    instance.on('newListener', function(event, listener){
+        if(event === 'warning' && listener.toString() === 'badSub') { //todo, hack to get this to work
+            instance.subscribeListener = true;
+        }
+    });
+    instance.pendingSubscribes = {};
     instance.client = Persistent.create('http://stream.datasift.com/', 80, header,init.bind(instance));
     instance.responseData = '';
     instance.attachedListeners = false;
@@ -60,7 +67,7 @@ __.prototype = Object.create(EventEmitter.prototype);
 /**
  * subscribes to multiple streams
  * @param hash - stream hash provided by datasift
- * @return {Promise}
+ * @return {promise}
  */
 __.prototype.subscribe = function(hash) {
     var d = Q.defer();
@@ -88,35 +95,9 @@ __.prototype.subscribe = function(hash) {
 };
 
 /**
- * attempts to subscribe to a specific stream hash
- * @param hash
- * @return {Promise}
- * @private
- */
-__.prototype._subscribeToStream = function(hash) {
-    var d = Q.defer();
-    var badSubscribe = false;
-    var subscribeMessage = JSON.stringify({'action' : 'subscribe', 'hash' : hash});
-    this.once('warning', function(message) {
-        if(!message.indexOf('You did not send a valid hash to subscribe to',-1)){
-            badSubscribe = true;
-            this.statusCode =  404;
-            d.reject('bad stream hash (' + hash + ').');
-        }
-    });
-    this.client.write(subscribeMessage,'utf-8');
-
-    Q.delay(__.SUBSCRIBE_WAIT).then(
-        function() {
-            d.resolve();
-        });
-    return d.promise;
-};
-
-/**
  * unsubscribes to a already subscribed stream
  * @param hash
- * @return {Promise}
+ * @return {promise}
  */
 __.prototype.unsubscribe = function(hash) {
     var body = JSON.stringify({'action' : 'unsubscribe', 'hash' : hash});
@@ -126,8 +107,53 @@ __.prototype.unsubscribe = function(hash) {
 };
 
 /**
+ * attempts to subscribe to a specific stream hash
+ * @param hash
+ * @return {promise}
+ * @private
+ */
+__.prototype._subscribeToStream = function(hash) {
+    var d = Q.defer();
+    var subscribeMessage = JSON.stringify({'action' : 'subscribe', 'hash' : hash});
+    var self = this;
+    var badSub = function(message) {
+        if(!message.indexOf('You did not send a valid hash to subscribe to',-1)){
+            self.statusCode =  404;
+            d.reject('improperly formatted stream hash'); //the hash can get in a strange state at this point
+        } else if(!message.indexOf("The hash",-1)) {
+            var streamHash = message.split(' ')[2];
+            if(self.pendingSubscribes.hasOwnProperty(streamHash)) {
+                self.pendingSubscribes[streamHash].reject(message);
+                delete self.pendingSubscribes[streamHash];
+            }
+        }
+    };
+
+    //only add listener if it has not been connected
+    if(!this.subscribeListener){
+        this.on('warning', badSub);
+    }
+
+    if(this.pendingSubscribes.hasOwnProperty(hash)) { //already waiting
+        return this.pendingSubscribes[hash].promise;
+    }
+
+    this.pendingSubscribes[hash] = d;
+
+    this.client.write(subscribeMessage,'utf-8');
+
+    Q.delay(__.SUBSCRIBE_WAIT).then(
+        function() {
+            delete self.pendingSubscribes[hash];
+            d.resolve();
+        });
+
+    return this.pendingSubscribes[hash].promise;
+};
+
+/**
  * starts the connect
- * @return {Promise}
+ * @return {promise}
  * @private
  */
 __.prototype._start = function() {
@@ -173,7 +199,7 @@ __.prototype._resubscribe = function(){
 
 /**
  * shuts down the existing datasift stream
- * @return {Promise}
+ * @return {promise}
  */
 __.prototype.shutdown = function () {
     this.attachedListeners = false;
@@ -254,7 +280,7 @@ __.prototype._handleEvent = function (eventData) {
 
 /**
  * recycles the connection.  used when the driver is in an unrecoverable state.  a new underlying socket will be assigned.
- * @return {Promise}
+ * @return {promise}
  * @private
  */
 __.prototype._recycle = function(){
