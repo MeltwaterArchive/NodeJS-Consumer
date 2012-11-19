@@ -42,7 +42,7 @@ exports['subscribe'] = {
     'success' : function(test) {
         var ds = DataSift.create('login','apiKey');
 
-        test.expect(3);
+        test.expect(4);
         ds._start = function() {
             test.ok(true);
             return Q.resolve();
@@ -50,12 +50,17 @@ exports['subscribe'] = {
 
         ds._subscribeToStream = function(hash){
             test.equal(hash, 'abc123');
-            return Q.resolve();
+            return Q.resolve(hash);
+        };
+
+        ds._validateHash = function(hash) {
+            test.ok(true);
+            return true;
         };
 
         ds.subscribe('abc123').then(
-            function() {
-                test.equal(ds.streams.get('abc123'), null);
+            function(h) {
+                test.equal(h[0].valueOf(),'abc123');
                 test.done();
             }, function(err) {
                 test.ok(false);
@@ -66,18 +71,24 @@ exports['subscribe'] = {
 
     'will reject if client fails to connect' : function(test){
         var ds = DataSift.create('login','apiKey');
-        test.expect(2);
+        test.expect(4);
         ds._start = function() {
             test.ok(true);
             return Q.reject();
         };
 
+        ds._validateHash = function(hash) {
+            test.ok(true);
+            return true;
+        };
+
+        ds.shutdown = function() {
+            test.ok(true);
+            return Q.resolve();
+        };
         ds.subscribe('abc123').then(
-            function() {
-                test.ok(false);
-                test.done();
-            }, function(err) {
-                test.ok(true);
+            function(p) {
+                test.ok(!p[0].isFulfilled());
                 test.done();
             }
         ).done();
@@ -85,12 +96,16 @@ exports['subscribe'] = {
 
     'will reject if subscribe fails' : function(test) {
         var ds = DataSift.create('login','apiKey');
-        test.expect(4);
+        test.expect(5);
         ds._start = function() {
             test.ok(true);
             return Q.resolve();
         };
 
+        ds._validateHash = function(hash) {
+            test.ok(true);
+            return true;
+        };
         ds.shutdown = function() {
             test.ok(true);
             return Q.resolve();
@@ -101,6 +116,34 @@ exports['subscribe'] = {
             return Q.reject('failed to sub');
         };
 
+        ds.subscribe('123').then(
+            function(p) {
+                test.ok(!p[0].isFulfilled());
+                test.done();
+            }
+        ).done();
+    },
+
+    'will reject an invalid formatted hash' : function(test) {
+        var ds = DataSift.create('login','apiKey');
+        test.expect(2);
+
+        ds._validateHash = function(hash) {
+            test.ok(true);
+            return false;
+        };
+
+        ds.subscribe('1').then(
+            function(p) {
+                test.ok(!p[0].isFulfilled());
+                test.done();
+            }
+        ).done();
+    },
+
+    'will reject if hashes is not passed in a parameter' : function(test) {
+        var ds = DataSift.create('login','apiKey');
+
         ds.subscribe().then(
             function() {
                 test.ok(false);
@@ -109,7 +152,111 @@ exports['subscribe'] = {
                 test.ok(true);
                 test.done();
             }
+        )
+    },
+
+    'will unsubscribe if the subscribe object is has removed it' : function(test) {
+        var ds = DataSift.create('login','apiKey');
+        ds.streams['abc123'] = {};
+
+        ds.unsubscribe = function(hash) {
+            test.equal(hash, 'abc123');
+            return Q.resolve();
+        };
+
+        test.expect(2);
+
+        ds.subscribe({}).then(
+            function() {
+                test.ok(true);
+                test.done();
+            }, function(err) {
+                test.ok(false);
+                test.done();
+            }
+        )
+    },
+
+    'will handle an dictionary of hashes' : function(test) {
+        var ds = DataSift.create('login','apiKey');
+
+        test.expect(8);
+        var hashes = {
+            'key1' : undefined,
+            'key2' : undefined
+        }
+        ds._start = function() {
+            test.ok(true);
+            return Q.resolve();
+        };
+
+        ds._subscribeToStream = function(hash){
+            test.ok(true);
+            return Q.resolve(hash);
+        };
+
+        ds._validateHash = function(hash) {
+            test.ok(true);
+            return true;
+        };
+
+        ds.subscribe(hashes).then(
+            function(h) {
+                test.equal(h[0].valueOf(),'key1');
+                test.equal(h[1].valueOf(),'key2');
+                test.done();
+            }, function(err) {
+                test.ok(false);
+                test.done();
+            }
         ).done();
+    },
+
+    'will handle a dictionary of hashes with both valid and invalid hashes' : function(test) {
+        var ds = DataSift.create('login','apiKey');
+
+        test.expect(14);
+        var hashes = {
+            'key1' : undefined,
+            'key2' : undefined,
+            'key3' : {name: '123'},
+            'key4' : undefined
+        }
+
+        ds._start = function() {
+            test.ok(true);
+            return Q.resolve();
+        };
+
+        ds._subscribeToStream = function(hash){
+
+            test.ok(true);
+            if(hash === 'key1'){
+                return Q.reject('hash does not exist');
+            } else {
+                return Q.resolve(hash);
+            }
+
+        };
+
+        ds._validateHash = function(hash) {
+            test.ok(true);
+            return hash !== 'key2';
+        };
+
+        ds.subscribe(hashes).then(
+            function(h) {
+                test.ok(!h[0].isFulfilled());
+                test.ok(!h[1].isFulfilled());
+                test.equal(h[2].valueOf(),'key3');
+                test.equal(h[3].valueOf(),'key4');
+                test.done();
+            }, function(err) {
+                test.ok(false);
+                test.done();
+            }
+        ).done();
+
     }
 }
 
@@ -134,8 +281,10 @@ exports['subscribeToStream'] = {
         };
 
         ds._subscribeToStream('abc123').then(
-            function(){
-                test.ok(!ds.pendingSubscribes.hasOwnProperty('abc123'));
+            function(p){
+                test.equal(p.state, 'subscribed');
+                test.equal(p.hash, 'abc123');
+                test.ok(ds.streams['abc123'].state, 'subscribed');
                 test.done();
             }, function(err) {
                 test.ok(false);
@@ -143,27 +292,6 @@ exports['subscribeToStream'] = {
             }
         ).done();
 
-    },
-
-    'will reject a warning with invalid credentials is emitted' : function(test) {
-        var ds = DataSift.create('testuser', 'apiKey');
-
-        ds.client = {};
-
-        ds.client.write = function (body, encoding){
-            test.equal(body,'{"action":"subscribe","hash":"abc123"}' );
-        };
-
-        ds._subscribeToStream('abc123').then(
-            function(){
-                test.ok(false);
-                test.done();
-            }, function(err){
-                test.equal(err,'improperly formatted stream hash');
-                test.done();
-            }
-        )
-        ds.emit('warning', 'You did not send a valid hash to subscribe to');
     },
 
     'will reject on non-existent stream' : function(test) {
@@ -180,7 +308,7 @@ exports['subscribeToStream'] = {
                 test.ok(false);
                 test.done();
             }, function(err){
-                test.ok(!ds.pendingSubscribes.hasOwnProperty('abc123'));
+                test.ok(!ds.streams.hasOwnProperty('abc123'));
                 test.equal(err,"The hash abc123 doesn't exist");
                 test.done();
             }
@@ -190,14 +318,42 @@ exports['subscribeToStream'] = {
 
     'will return existing promise if attempting to subscribe already pending' : function(test) {
         var ds = DataSift.create('testuser', 'apyKey');
-        var mockedPromise = {};
-        ds.pendingSubscribes['abc123'] = {promise : mockedPromise};
+        var mockedPromise = {}
+        var mockedDeferred = {promise:mockedPromise};
+        ds.streams['abc123'] = {deferred : mockedDeferred, state: 'pending'};
         test.equal(mockedPromise, ds._subscribeToStream('abc123'));
         test.done();
     },
 
     'will not subscribe to warning twice' : function(test) {
-        test.done();
+        var ds = DataSift.create('a', 'b');
+        var count = 0
+        ds.on('newListener', function(){
+            if(count > 0){
+                test.ok(false);
+                test.done();
+            }
+            count++;
+        });
+
+        ds.client = {};
+        ds.client.write = function (body, encoding){
+
+        };
+
+        ds._subscribeToStream('abc123').then(
+            function(p){
+                ds._subscribeToStream('123').then(
+                    function() {
+                        test.equal(count,1);
+                        test.done();
+                    }
+                )
+            }, function(err) {
+                test.ok(false);
+                test.done();
+            }
+        ).done();
     }
 }
 
@@ -272,15 +428,16 @@ exports['resubscribe'] = {
     'success' : function(test) {
         var ds = DataSift.create('testuser', 'apiKey');
 
-        ds.streams.set('123', null);
-        ds.streams.set('456', null);
-        ds.streams.set('abc', null);
+        ds.streams['123'] = '123';
+        ds.streams['456'] = '456';
+        ds.streams['abc'] = 'abc';
 
         ds._subscribeToStream = function(hash) {
+            test.ok(!ds.streams.hasOwnProperty(hash));
             test.ok(true);
             return Q.resolve();
         };
-        test.expect(3);
+        test.expect(6);
         ds._resubscribe();
         test.done();
     },
@@ -288,16 +445,17 @@ exports['resubscribe'] = {
     'will handle subscribe rejects' : function(test) {
         var ds = DataSift.create('testuser', 'apiKey');
 
-        ds.streams.set('123', null);
-        ds.streams.set('456', null);
-        ds.streams.set('abc', null);
+        ds.streams['123'] = '123';
+        ds.streams['456'] = '456';
+        ds.streams['abc'] = 'abc';
 
         ds._subscribeToStream = function(hash) {
+            test.ok(!ds.streams.hasOwnProperty(hash));
             test.ok(true);
             return Q.reject();
         };
 
-        test.expect(3);
+        test.expect(6);
         ds._resubscribe();
         test.done();
     }
@@ -474,10 +632,10 @@ exports['unsubscribe'] = {
         ds.client.write = function(contents) {
             test.equal(contents, JSON.stringify({'action' : 'unsubscribe', 'hash' : 'abc123'}));
         };
-        ds.streams.set('abc123', 'test123');
+        ds.streams['abc123'] = 'test123';
         ds.unsubscribe('abc123').then(
             function() {
-                test.equal(ds.streams.length, 0);
+                test.equal(Object.keys(ds.streams).length, 0);
                 test.done();
             }, function(err) {
                 test.ok(false);
@@ -612,3 +770,50 @@ exports['recycle'] = {
             ).done();
     }
 }
+
+exports['validateHash'] = {
+    'success' : function(test) {
+        var ds = DataSift.create('a', 'b');
+
+        test.ok(ds._validateHash('69ec6f20f05f513e3b144b90fecc2e3f'));
+        test.done();
+    },
+
+    'failure' : function(test) {
+        var ds = DataSift.create('a','b');
+
+        test.ok(!ds._validateHash('invalidHash'));
+        test.ok(!ds._validateHash(''));
+        test.ok(!ds._validateHash());
+        test.ok(!ds._validateHash('69ec6f20f05f513e3b144b90fecc2e3fa'));
+        test.ok(!ds._validateHash('69ec6f20f05f513e3b144b90fecc2e3'));
+        test.ok(!ds._validateHash('69ec6f20f05f513e3b144b90fecc2e3 '));
+
+        test.done();
+
+    }
+}
+
+exports["hashDifference"] = {
+    "success" : function(test) {
+        var tc = new DataSift('keyId', 'key');
+
+        var hashes1 = {x:"x", y:"y", z:"z"};
+        var hashes2 = {a:"a", x:"x", y:"y"};
+
+        test.deepEqual(tc._hashDifference(hashes1,hashes2), {z:'z'});
+        test.deepEqual(tc._hashDifference(hashes2, hashes1), {a:'a'});
+        test.done();
+    },
+
+    "will handle undefined object params" : function(test) {
+        var tc = new DataSift('keyId', 'key');
+
+        var hashes1 = {x:"x", y:"y", z:"z"};
+
+        test.deepEqual(tc._hashDifference(undefined,hashes1), []);
+        test.deepEqual(tc._hashDifference(hashes1, undefined), {x:'x', y:'y', z:'z'});
+        test.done();
+    }
+}
+

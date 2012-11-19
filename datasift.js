@@ -9,7 +9,6 @@
 var Persistent = require('tenacious-http');
 var EventEmitter = require('events').EventEmitter;
 var Q = require('q');
-var Hash = require('hashtable').QHash;
 
 var __ = function() {
     EventEmitter.call(this);
@@ -50,44 +49,67 @@ __.create = function(login, apiKey){
     };
     instance.subscribeListener = false;
     instance.attachedSubscribeWarningListener = false;
-    instance.pendingSubscribes = {};
     instance.client = Persistent.create('http://stream.datasift.com/', 80, header,init.bind(instance));
     instance.responseData = '';
     instance.attachedListeners = false;
-    instance.streams = new Hash();
+    instance.streams = {};
     return instance;
-}
+};
 
 __.prototype = Object.create(EventEmitter.prototype);
 
 /**
- * subscribes to multiple streams
- * @param hash - stream hash provided by datasift
- * @return {promise}
+ * subscribes to multiple streams.
+ * @param hashes - stream hashes provided by datasift.  either a string of single hash or an object keyed on the datasift hash
+ * @return {array of promises}
  */
-__.prototype.subscribe = function(hash) {
-    var d = Q.defer();
+__.prototype.subscribe = function(hashes) {
     var self = this;
 
-    this._start().then(
-        function() {
-            return self._subscribeToStream(hash);
-        }, function(err){
-            d.reject(err);
-        }
-    ).then(
-        function(){
-            self.streams.set(hash, null);
-            d.resolve();
-        }, function(err) {
-            self.shutdown().then(
-                function(){
-                    d.reject(err);
-                }
-            );
+    if(!hashes){
+        return Q.reject('hashes is a required paramater');
+    }
+
+    if(typeof hashes === 'string') {
+        var h = hashes;
+        hashes = {};
+        hashes[h] = {};
+    }
+
+    var streamsToSubscribe = this._hashDifference(hashes, this.streams);
+    var streamsToUnsubscribe = this._hashDifference(this.streams, hashes);
+    var promises = [];
+
+    Object.keys(streamsToUnsubscribe).forEach(
+        function(hash){
+            self.unsubscribe(hash);
         }
     );
-    return d.promise;
+
+    Object.keys(streamsToSubscribe).forEach(
+        function(hash) {
+            if(!self._validateHash(hash)) {
+                promises.push(Q.reject('invalid hash'));
+                return;
+            }
+
+            promises.push(self._start().then(
+                function() {
+                    return self._subscribeToStream(hash, streamsToSubscribe[hash]);
+                }
+            ).fail(
+                function(err){
+                    //only shutdown if there are no pending subscribes AND there are no active streams
+                    if(Object.keys(self.streams).length === 0) {
+                        self.shutdown();
+                    }
+                    return Q.reject(err);
+                }
+            ));
+        }
+    );
+
+    return Q.allResolved(promises);
 };
 
 /**
@@ -98,54 +120,57 @@ __.prototype.subscribe = function(hash) {
 __.prototype.unsubscribe = function(hash) {
     var body = JSON.stringify({'action' : 'unsubscribe', 'hash' : hash});
     this.client.write(body, 'utf-8');
-    this.streams.remove(hash);
+    delete this.streams[hash];
     return Q.resolve();
 };
 
 /**
  * attempts to subscribe to a specific stream hash
  * @param hash
- * @return {promise}
+ * @return {promise} - return a stream state object
  * @private
  */
-__.prototype._subscribeToStream = function(hash) {
+__.prototype._subscribeToStream = function(hash, value) {
     var d = Q.defer();
     var subscribeMessage = JSON.stringify({'action' : 'subscribe', 'hash' : hash});
     var self = this;
-    var badSub = function(message) {
-        if(!message.indexOf('You did not send a valid hash to subscribe to',-1)){
-            self.statusCode =  404;
-            d.reject('improperly formatted stream hash'); //the hash can get in a strange state at this point
-        } else if(!message.indexOf("The hash",-1)) {
-            var streamHash = message.split(' ')[2];
-            if(self.pendingSubscribes.hasOwnProperty(streamHash)) {
-                self.pendingSubscribes[streamHash].reject(message);
-                delete self.pendingSubscribes[streamHash];
-            }
-        }
-    };
 
     //only add listener if it has not been connected
-    if(!this.attachedSubscribeWarningListener){
-        this.on('warning', badSub);
+    if(!this.attachedSubscribeWarningListener) {
+        this.on('warning', function(message) {
+            if(!message.indexOf("The hash",-1)) {
+                var streamHash = message.split(' ')[2];
+                if(self.streams.hasOwnProperty(streamHash)) {
+                    self.streams[streamHash].deferred.reject(message);
+                    delete self.streams[streamHash];
+                }
+            }
+        });
         this.attachedSubscribeWarningListener = true;
     }
 
-    if(this.pendingSubscribes.hasOwnProperty(hash)) { //already waiting
-        return this.pendingSubscribes[hash].promise;
+    if(this.streams.hasOwnProperty(hash)) { //already waiting or subscribed
+        return this.streams[hash].deferred.promise;
     }
 
-    this.pendingSubscribes[hash] = d;
+    if(value === undefined) {
+        value = {};
+    }
+    this.streams[hash] = value;
+    this.streams[hash].deferred = d;
+    this.streams[hash].state = 'pending';
+    this.streams[hash].hash = hash;
 
     this.client.write(subscribeMessage,'utf-8');
 
     Q.delay(__.SUBSCRIBE_WAIT).then(
         function() {
-            delete self.pendingSubscribes[hash];
-            d.resolve();
+            self.streams[hash].state = 'subscribed';
+            //d.resolve(hash);
+            d.resolve(self.streams[hash]);
         });
 
-    return this.pendingSubscribes[hash].promise;
+    return this.streams[hash].deferred.promise;
 };
 
 /**
@@ -183,7 +208,8 @@ __.prototype._start = function() {
  */
 __.prototype._resubscribe = function(){
     var self = this;
-    this.streams.forEach(function(key,v){ //key = datasift hash
+    Object.keys(this.streams).forEach(function(key){ //key = datasift hash
+        delete self.streams[key];
         self._subscribeToStream(key).then(
             function(){
                 self.emit('debug', 'reconnected to stream hash ' + key);
@@ -201,7 +227,7 @@ __.prototype._resubscribe = function(){
 __.prototype.shutdown = function () {
     this.attachedListeners = false;
     this.attachedSubscribeWarningListener = false;
-    this.streams = new Hash();
+    this.streams = {};
     this.client.write(JSON.stringify({'action' : 'stop'}));
     return this.client.stop();
 };
@@ -293,6 +319,37 @@ __.prototype._recycle = function(){
             return Q.reject(err);
         }
     );
+};
+
+/**
+ * validates the format of the hash
+ * required to be a 32 character hex string
+ * @param hash
+ * @return {Boolean}
+ * @private
+ */
+__.prototype._validateHash = function (hash) {
+    return /^[a-f0-9]{32}$/i.test(hash);
+};
+
+/**
+ * takes the difference between two hashes {hash1} - {hash2} = {resulting set}
+ * @param hash1
+ * @param hash2
+ * @return {Object}
+ * @private
+ */
+__.prototype._hashDifference = function(hash1, hash2) {
+    hash1 = hash1 || {};
+    hash2 = hash2 || {};
+
+    var difference = {};
+    Object.keys(hash1).forEach( function(key) {
+        if(!hash2.hasOwnProperty(key)) {
+            difference[key] = hash1[key];
+        }
+    });
+    return difference;
 };
 
 module.exports = __;

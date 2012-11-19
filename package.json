@@ -6,12 +6,10 @@
     "keywords": [
         "datasift",
         "twitter",
-        "facebook",
         "streaming"
     ],
     "dependencies": {
         "q": "",
         "tenacious-http":"",
-        "hashtable":""
     }
 }
