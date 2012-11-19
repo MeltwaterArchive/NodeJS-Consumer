@@ -10,6 +10,6 @@
     ],
     "dependencies": {
         "q": "",
-        "tenacious-http":"",
+        "tenacious-http":""
     }
 }
