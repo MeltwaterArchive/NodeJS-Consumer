@@ -49,11 +49,7 @@ __.create = function(login, apiKey){
         this.client.write('\n');
     };
     instance.subscribeListener = false;
-    instance.on('newListener', function(event, listener){
-        if(event === 'warning' && listener.toString() === 'badSub') { //todo, hack to get this to work
-            instance.subscribeListener = true;
-        }
-    });
+    instance.attachedSubscribeWarningListener = false;
     instance.pendingSubscribes = {};
     instance.client = Persistent.create('http://stream.datasift.com/', 80, header,init.bind(instance));
     instance.responseData = '';
@@ -130,8 +126,9 @@ __.prototype._subscribeToStream = function(hash) {
     };
 
     //only add listener if it has not been connected
-    if(!this.subscribeListener){
+    if(!this.attachedSubscribeWarningListener){
         this.on('warning', badSub);
+        this.attachedSubscribeWarningListener = true;
     }
 
     if(this.pendingSubscribes.hasOwnProperty(hash)) { //already waiting
@@ -203,6 +200,7 @@ __.prototype._resubscribe = function(){
  */
 __.prototype.shutdown = function () {
     this.attachedListeners = false;
+    this.attachedSubscribeWarningListener = false;
     this.streams = new Hash();
     this.client.write(JSON.stringify({'action' : 'stop'}));
     return this.client.stop();
