@@ -35,38 +35,33 @@ sets of docs for the GitHub pages for this project.
 
     `git checkout gh-pages`
 
-8. Fetch the datasift/NodeJS-Consumer gh-pages branch
-
-    `git fetch https://github.com/datasift/NodeJS-Consumer gh-pages`
-
-9. Change the working directory to doc-tools
+8. Change the working directory to doc-tools
 
     `cd doc-tools`
 
-10. Run autodoc generator tools
+9. Run autodoc generator tools
 
     `sh ./make-docs.sh`
 
-
-11. Change to the parent directory
+10. Change to the parent directory
 
     `cd ..`
 
-12. Stage new documentation in git
+11. Stage new documentation in git
 
     `git add *.html`
 
     `git add *.css`
 
-13. Commit the new documentation
+12. Commit the new documentation
 
     `git commit -m "Include a meaningful description here."``
 
-14. Push changes to github
+13. Push changes to github
 
     `git push origin gh-pages`
 
-15. That's it! you can delete the temporary directory now.
+14. That's it! you can delete the temporary directory now.
 
     `cd ../..`
 
