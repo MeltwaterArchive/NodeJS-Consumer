@@ -11,7 +11,7 @@ sets of docs for the GitHub pages for this project.
 
     `sudo apt-get install git`
 
-2 Create a temporary directory
+2. Create a temporary directory
 
     `mkdir tmp`
 
@@ -66,7 +66,7 @@ sets of docs for the GitHub pages for this project.
 
     `git push origin gh-pages`
 
-That's it! you can delete the temporary directory now.
+15. That's it! you can delete the temporary directory now.
 
     `cd ../..`
 
