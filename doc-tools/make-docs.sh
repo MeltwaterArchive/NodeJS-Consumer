@@ -11,7 +11,7 @@ which docco >/dev/null 2>&1 || { echo >&2 \
 "sudo easy_install Pygments\n" \
 ; exit 1; }
 
-docco ../*.js
+docco ../../master/*.js
 
 cd docs
 fl=`ls *html`
@@ -32,6 +32,5 @@ docco index.js
 cat docs/index.html | sed -e 's/index.js/NodeJS-Consumer/g' > docs/index_new.html
 mv docs/index_new.html docs/index.html
 
-#rm -rf gh-pages
-#mv docs gh-pages
-#tar zcf gh-pages.tar.gz gh-pages
+cp docs/* ../
+rm -rf docs index.js index-body.js
