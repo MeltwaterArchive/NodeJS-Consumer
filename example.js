@@ -34,6 +34,11 @@ consumer.on("delete", function(data){
 //Connect
 //Subscribe to Foursquare and Gowalla checkins
 consumer.subscribe('e4941c3a0b4a905314ce806dea26e0d7').then(
-    function() {
-	    console.log("Connected!");
+    function(promises) {
+	    promises.forEach( function(promise) {
+            if(promise.isFulfilled()) {
+                console.log(promise.valueOf().hash + " Connected!");
+            }
+
+        });
     });

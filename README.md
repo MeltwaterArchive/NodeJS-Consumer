@@ -21,15 +21,20 @@ Factory method which returns a DataSift instance
     //Create a datasift instance via the factory method like:
     var ds = DataSift.create('YOUR_ACCOUNT', 'YOUR_API_KEY');
 ###subscribe(streamHash)
-Starts listening to the specific stream hash given, returning a completion promise.
-Multiple streams can be subscribed to per DataSift instance.
-    
-    ds.subscribe('YOUR_STREAM_HASH').then(
-        function() {
-            //successful start
-        }, function(err) {
-            //error starting the listener
-        });
+Starts listening to the specific streams hashes given, putting the driver into the state passed in.
+Multiple streams can be subscribed to per DataSift instance.  Overloaded so that either a string of single hash or an object keyed on the datasift hash
+
+    var streams = ({'YOUR_STREAM_HASH_1' : ANYTHING, 'YOUR_STREAM_HASH_2 : ANYTHING, … YOUR_STREAM_HASH_N});
+
+    ds.subscribe(streams).then(
+        function(resultingPromises) {
+            resultingPromises.forEach( function(promise) {
+            if(promise.isFulfilled()) {
+                //promise.valueOf().hash subscribed
+            } else {
+                //failed with reason promise.valueOf.exception
+            }
+	    }});
 ###unsubscribe(streamHash)
 Unsubscribes to a stream already subscribed by the underlying connection to DataSift
 
@@ -57,14 +62,16 @@ See also the example.js file.
 
     // start listening to the stream:
 
-    ds.subscribe('YOUR_STREAM_HASH').then(
-        function () {
-            console.log("Connected to DataSift");
-        },
-        function () {
-            console.log("Error connecting to DataSift");
-        }
-    );
+    ds.subscribe(streams).then(
+        function(resultingPromises) {
+            resultingPromises.forEach( function(promise) {
+		if(promise.isFulfilled()) {
+			//promise.valueOf().hash subscribed
+		} else {
+			//failed with reason promise.valueOf.exception
+		}
+	    }
+        });
 
 
 ## events emitted
@@ -86,3 +93,13 @@ See also the example.js file.
     An event coming from DataSift which its status cannot be determined.
 ###debug(message)
     Information relating the transition in state of the driver.  Used for debugging purposes.
+
+##License
+
+Copyright (c) 2012 LocalResponse Inc.
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
