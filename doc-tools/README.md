@@ -14,10 +14,15 @@ sets of docs for the GitHub pages for this project.
 2. Make sure that the documentation generator environment is installed on your system.  You can install it using these commands:
 
     `sudo apt-get install nodejs`
+
     `sudo apt-get install npm`
+
     `sudo apt-get install python-setuptools`
+
     `sudo npm install -g docco`
+
     `sudo npm install -g coffee-script`
+
     `sudo easy_install Pygments`
 
 3. Create a temporary directory
