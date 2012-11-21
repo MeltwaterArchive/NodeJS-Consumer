@@ -24,13 +24,13 @@ Factory method which returns a DataSift instance
 Starts listening to the specific streams hashes given, putting the driver into the state passed in.
 Multiple streams can be subscribed to per DataSift instance.  Overloaded so that either a string of single hash or an object keyed on the datasift hash
 
-    var streams = ({'YOUR_STREAM_HASH_1' : ANYTHING, 'YOUR_STREAM_HASH_2 : ANYTHING, … YOUR_STREAM_HASH_N});
+    var streams = ({'YOUR_STREAM_HASH_1' : {name: hash1}, 'YOUR_STREAM_HASH_2 : {name : hash2}, … YOUR_STREAM_HASH_N : {name: hashN});
 
     ds.subscribe(streams).then(
         function(resultingPromises) {
             resultingPromises.forEach( function(promise) {
             if(promise.isFulfilled()) {
-                //promise.valueOf().hash subscribed
+                //promise.valueOf().name subscribed
             } else {
                 //failed with reason promise.valueOf.exception
             }
