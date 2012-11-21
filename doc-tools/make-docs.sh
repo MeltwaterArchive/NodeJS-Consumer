@@ -17,14 +17,13 @@ cd docs
 fl=`ls *html`
 cd ..
 
-echo -n '//' > index-body.js
 for f in $fl
 do 
-	echo -n '<a href="'$f'">'$f'</a><br />' >> index-body.js;
+	echo '//<a href="'$f'">'$f'</a><br />' >> index-body.js;
 done
 
-echo '<a href="https://github.com/datasift/NodeJS-Consumer/blob/master/LICENSE">LICENSE</a><br />' >> index-body.js
-echo '<a href="https://github.com/datasift/NodeJS-Consumer/blob/master/README.md">README.md</a><br />' >> index-body.js
+echo '//<a href="https://github.com/datasift/NodeJS-Consumer/blob/master/LICENSE">LICENSE</a><br />' >> index-body.js
+echo '//<a href="https://github.com/datasift/NodeJS-Consumer/blob/master/README.md">README.md</a><br />' >> index-body.js
 echo ' ' >> index-body.js
 
 cat index-header.js index-body.js index-footer.js > index.js

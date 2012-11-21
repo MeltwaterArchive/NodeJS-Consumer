@@ -3,7 +3,7 @@
 This document exists for the benefit of anyone who wants to generate a new
 sets of docs for the GitHub pages for this project.
 
-1.  Make sure that git is installed on your system:
+1. Make sure that git is installed on your system:
 
     `git --version`
 
@@ -11,57 +11,66 @@ sets of docs for the GitHub pages for this project.
 
     `sudo apt-get install git`
 
-2. Create a temporary directory
+2. Make sure that the documentation generator environment is installed on your system.  You can install it using these commands:
+
+    `sudo apt-get install nodejs`
+    `sudo apt-get install npm`
+    `sudo apt-get install python-setuptools`
+    `sudo npm install -g docco`
+    `sudo npm install -g coffee-script`
+    `sudo easy_install Pygments`
+
+3. Create a temporary directory
 
     `mkdir tmp`
 
-3. Change the current working directory
+4. Change the current working directory
 
     `cd tmp`
 
-4. Clone the datasift/NodeJS-Consumer into master directory
+5. Clone the datasift/NodeJS-Consumer into master directory
 
     `git clone https://github.com/datasift/NodeJS-Consumer master`
 
-5. Clone the datasift/NodeJS-Consumer into gh-pages directory
+6. Clone the datasift/NodeJS-Consumer into gh-pages directory
 
     `git clone https://github.com/datasift/NodeJS-Consumer gh-pages`
 
-6. Change the current working directory to gh-pages
+7. Change the current working directory to gh-pages
 
     `cd gh-pages`
 
-7. Switch to the gh-pages branch
+8. Switch to the gh-pages branch
 
     `git checkout gh-pages`
 
-8. Change the working directory to doc-tools
+9. Change the working directory to doc-tools
 
     `cd doc-tools`
 
-9. Run autodoc generator tools
+10. Run autodoc generator tools
 
     `sh ./make-docs.sh`
 
-10. Change to the parent directory
+11. Change to the parent directory
 
     `cd ..`
 
-11. Stage new documentation in git
+12. Stage new documentation in git
 
     `git add *.html`
 
     `git add *.css`
 
-12. Commit the new documentation
+13. Commit the new documentation
 
-    `git commit -m "Include a meaningful description here."``
+    `git commit -m "Include a meaningful description here."`
 
-13. Push changes to github
+14. Push changes to github
 
     `git push origin gh-pages`
 
-14. That's it! you can delete the temporary directory now.
+15. That's it! you can delete the temporary directory now.
 
     `cd ../..`
 
