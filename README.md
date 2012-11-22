@@ -11,7 +11,7 @@ Note that this module is promise based (via the Q library) and event based (via 
 
 ## Install
 - Using npm `npm install datasift`
-- Add it to your project `require('datasift.js');`
+- Add it to your project `require('datasift');`
 
 ## Use
 
