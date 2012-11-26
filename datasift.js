@@ -281,7 +281,11 @@ __.prototype._handleEvent = function (eventData) {
     if (eventData.status === 'failure') {
         if(eventData.message !== 'A stop message was received. You will now be disconnected') {
             this.emit('error', new Error(eventData.message));
-            this.client.recover();
+            this.client.recover().then(
+                function() {
+                    self._resubscribe();
+                }
+            );
         } else { //means shutdown was called.
             this.client = undefined;
         }
@@ -294,7 +298,7 @@ __.prototype._handleEvent = function (eventData) {
     } else if (eventData.data !== undefined && eventData.data.interaction !== undefined) {
         clearTimeout(this.interactionTimeout);
         this.interactionTimeout = setTimeout(function(){
-            self._recycle.bind(self)();
+            self._recycle();
         }, __.INTERACTION_TIMEOUT);
         this.emit('interaction', eventData);
     } else {
@@ -311,13 +315,20 @@ __.prototype._recycle = function(){
     var self = this;
     this.emit('debug', 'recycling connection');
 
-    return this.client.stop().then(this.client.recover).then(
-        function(){
-            self._resubscribe();
-        }, function(err){
+    return this.client.stop().then(
+        function() {
+            return self.client.recover();
+    }).then(
+        function() {
+            return self._resubscribe();
+        }
+    ).fail(
+        function(err) {
+
             self.emit('error', 'failed to reconnect: ' + err);
             return Q.reject(err);
         }
+
     );
 };
 

@@ -490,11 +490,17 @@ exports['handleEvent'] = {
         var ds = DataSift.create('testuser','apiKey');
         var eventData = {};
 
-        test.expect(2);
+        test.expect(3);
 
         ds.client.recover = function() {
             test.ok(true);
+            return Q.resolve();
         };
+        ds._resubscribe = function() {
+            test.ok(true);
+            test.done();
+            return Q.resolve();
+        }
 
         eventData.status = 'failure';
 
@@ -502,7 +508,7 @@ exports['handleEvent'] = {
             test.ok(true);
         });
         ds._handleEvent(eventData);
-        test.done();
+
     },
 
     'will emit warning if data json status is a warning' : function (test) {
@@ -730,6 +736,7 @@ exports['recycle'] = {
 
         ds._resubscribe = function() {
             test.ok(true);
+            return Q.resolve();
         };
 
         test.expect(4);
