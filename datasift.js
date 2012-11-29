@@ -324,11 +324,9 @@ __.prototype._recycle = function(){
         }
     ).fail(
         function(err) {
-
             self.emit('error', 'failed to reconnect: ' + err);
             return Q.reject(err);
         }
-
     );
 };
 

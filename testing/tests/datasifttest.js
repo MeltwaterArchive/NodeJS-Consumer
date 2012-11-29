@@ -496,16 +496,17 @@ exports['handleEvent'] = {
             test.ok(true);
             return Q.resolve();
         };
+
         ds._resubscribe = function() {
             test.ok(true);
             test.done();
-            return Q.resolve();
-        }
+        };
 
         eventData.status = 'failure';
 
         ds.on('error', function (err) {
             test.ok(true);
+
         });
         ds._handleEvent(eventData);
 
