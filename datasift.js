@@ -1,335 +1,367 @@
-var http = require('http');
-var util = require('util');
-var events = require('events');
-
-/** 
- * Creates DataSift instance
- *
- * @param string   username
- * @param string   API key
- * 
- * @return void
- */
-function DataSift(username, apiKey, host, port) {
-	events.EventEmitter.call(this);
-	var self = this;
-	
-	//The username
-	this.username = username;
-
-	//The API key
-	this.apiKey = apiKey;
-
-	//The user agent
-	this.userAgent = 'DataSiftNodeConsumer/0.2.1';
-	
-	//The host
-	if (host !== undefined) {
-		this.host = host;
-	} else {
-		this.host = 'stream.datasift.com';
-	}
-	
-	//The port
-	if (port !== undefined) {
-		this.port = port;
-	} else {
-		this.port = 80;
-	}
-	
-	//The request object
-	this.request = null;
-	
-	//The response object
-	this.response = null;
-	
-	//Last connect
-	this.lastConnect = null;
-	
-	//Data
-	this.data = '';
-
-	//Add a listener for processing closing
-	process.on('exit', function () {
-		self.disconnect();
-	});
-	
-	//Connect timeout
-	this.connectTimeout = null;
-	
-	//Convert the next error to a success
-	this.convertNextError = false;
-	
-	//Error callback
-	this.errorCallback = function(err, emitDisconnect) {
-		if (emitDisconnect === undefined) {
-			emitDisconnect = false;
-		}
-		self.emit('error', err);
-		self.disconnect(emitDisconnect);
-	}
-	
-	//Disconnection callback
-	this.disconnectCallback = function() {
-		//Handle disconnection
-		self.disconnect(true);
-	}
-	
-	//Data callback
-	this.dataCallback = function(chunk) {
-		
-		//Convert to utf8 from buffer
-		chunk = chunk.toString('utf8');
-		
-		//Add chunk to data
-		self.data += chunk;
-		
-		//If the string contains a line break we will have JSON to process
-		if (chunk.indexOf("\n") > 0) {
-			//Split by line space and look for json start
-			var data = self.data.split("\n");
-			if (data[0] !== undefined) {
-				var json = null;
-				try {json = JSON.parse(data[0])} catch (e) {}
-				if (json != null) {
-					self.receivedData(json);
-				}
-			}
-			
-			//Add the second half of the chunk to a new piece of data
-			self.data = data[1];
-			
-		}
-		
-	}
-	
-	//Response callback
-	this.responseCallback = function(response) {		
-		self.response = response;
-		
-		//Set the last successful connect
-		self.lastConnect = new Date().getTime();
-		
-		//Clear the request timeout
-		if (self.connectTimeout != null) {
-			clearTimeout(self.connectTimeout);
-		}
-
-		//Emit a connected event
-		self.emit('connect');
-
-		//Disconnection
-		response.connection.on('end', self.disconnectCallback);
-		
-		//When we receive data do something with it
-		response.on('data', self.dataCallback);
-	};
-	
-}
-util.inherits(DataSift, events.EventEmitter);
-
-
 /**
- * Open a connection to DataSift
- *
- * @return void
+ * User: wadeforman
+ * Date: 11/6/12
+ * Time: 11:01 AM
  */
-DataSift.prototype.connect = function() {
-	var self = this;
-	
-	//Connect if we are allowed
-	if (this.lastConnect == null || this.lastConnect < new Date().getTime() - 1500) {
-		
-		//Create the headers
-		var headers = {
-			'User-Agent'        : this.userAgent,
-			'Host'              : this.host,
-			'Connection'        : 'Keep-Alive',
-			'Transfer-Encoding' : 'chunked',
-			'Authorization'     : this.username + ':' + this.apiKey
-		};
 
-		//Create an http client
-		var client = http.createClient(this.port, this.host);
-		
-		//Make the request
-		this.request = client.request("GET", '/', headers);
+"use strict"
 
-		//Check for an error on connection
-		client.on('error', function(){
-			self.errorCallback(new Error('Error connecting to DataSift: Could not reach DataSift. Check your internet connection.'));
-		});
+var Persistent = require('tenacious-http');
+var EventEmitter = require('events').EventEmitter;
+var Q = require('q');
 
-		//Add a connection timeout
-		this.connectTimeout = setTimeout(function() {
-			if (self.request != null) {
-				self.request.abort();
-				self.errorCallback(new Error('Error connecting to DataSift: Timed out waiting for a response'));
-				self.disconnect(true);
-			}
-			clearTimeout(self.connectTimeout);
-			self.connectTimeout = null;
-		}, 5000);
-
-		//Check for an error
-		this.request.on('error', this.errorCallback);
-
-		//Add a listener for the response
-		this.request.on('response', this.responseCallback);
-		this.request.write("\n", 'utf8');
-	
-	} else {
-		//Not allowed to reconnect so emit error
-		this.errorCallback(new Error('You cannot reconnect too soon after a disconnection'), true);
-	}
-	
+var __ = function() {
+    EventEmitter.call(this);
 };
 
+__.SUBSCRIBE_WAIT = 750;
+__.INTERACTION_TIMEOUT = 300000;
 
 /**
- * Disconnected from DataSift
- *
- * @param boolean forced if the disconnection was forced or not
- * 
- * @return void
+ * creates an instance of the datasift driver
+ * @param login
+ * @param apiKey
+ * @return {Object datasiftdriver}
  */
-DataSift.prototype.disconnect = function(forced) {
-	if (forced && this.request !== null) {
-		//Reset request and response
-		this.emit('disconnect');
-		
-		//Remove listeners
-		this.request.removeListener('error', this.errorCallback);
-		this.request.removeListener('response', this.responseCallback);
-		if (this.response != null) {
-			this.response.connection.removeListener('end', this.disconnectCallback);
-			this.response.removeListener('data', this.dataCallback);
-		}
+__.create = function(login, apiKey){
+    var instance = new __();
+    if(login) {
+        instance.login = login;
+    } else {
+        throw new Error('login is a required param');
+    }
 
-		//Clear the request and response objects
-		this.request = null;
-		this.response = null;
-		
-	} else if (this.request !== null) {
-		//Send the stop message and convert the error response
-		this.convertNextError = true;
-		this.send(JSON.stringify({"action":"stop"}));
-	}
+    if(apiKey) {
+        instance.apiKey = apiKey;
+    } else {
+        throw new Error('apiKey is a required param');
+    }
+
+    var header = {
+        'User-Agent'        : 'DataSiftNodeConsumer/0.2.1',
+        'Host'              : 'http://stream.datasift.com/',
+        'Connection'        : 'Keep-Alive',
+        'Transfer-Encoding' : 'chunked',
+        'Authorization'     : login + ':' + apiKey
+    };
+    var init = function() {
+        this.client.write('\n');
+    };
+    instance.subscribeListener = false;
+    instance.attachedSubscribeWarningListener = false;
+    instance.client = Persistent.create('http://stream.datasift.com/', 80, header,init.bind(instance));
+    instance.responseData = '';
+    instance.attachedListeners = false;
+    instance.streams = {};
+    return instance;
 };
 
+__.prototype = Object.create(EventEmitter.prototype);
+
+__.prototype.connect = function() {
+    return this._start();
+};
+/**
+ * subscribes to multiple streams.
+ * @param hashes - stream hashes provided by datasift.  either a string of single hash or an object keyed on the datasift hash
+ * @return {array of promises}
+ */
+__.prototype.subscribe = function(hashes) {
+    var self = this;
+
+    if(!hashes){
+        return Q.reject('hashes is a required paramater');
+    }
+
+    if(typeof hashes === 'string') {
+        var h = hashes;
+        hashes = {};
+        hashes[h] = {};
+    }
+
+    var streamsToSubscribe = this._hashDifference(hashes, this.streams);
+    var streamsToUnsubscribe = this._hashDifference(this.streams, hashes);
+    var promises = [];
+
+    Object.keys(streamsToUnsubscribe).forEach(
+        function(hash){
+            self.unsubscribe(hash);
+        }
+    );
+
+    Object.keys(streamsToSubscribe).forEach(
+        function(hash) {
+            if(!self._validateHash(hash)) {
+                promises.push(Q.reject('invalid hash'));
+                return;
+            }
+
+            promises.push(self._start().then(
+                function() {
+                    return self._subscribeToStream(hash, streamsToSubscribe[hash]);
+                }
+            ).fail(
+                function(err){
+                    //only shutdown if there are no pending subscribes AND there are no active streams
+                    if(Object.keys(self.streams).length === 0) {
+                        self.shutdown();
+                    }
+                    return Q.reject(err);
+                }
+            ));
+        }
+    );
+
+    return Q.allResolved(promises);
+};
 
 /**
- * Subscribe to a hash
- *
- * @param string hash the stream hash
- * 
- * @return void
+ * unsubscribes to a already subscribed stream
+ * @param hash
+ * @return {promise}
  */
-DataSift.prototype.subscribe = function(hash) {
-	//Check the hash
-	if (!this.checkHash(hash)) {
-		//Send error
-		this.emit('error', new Error('Invalid hash given: ' + hash));
-	} else {
-		//Send json message to DataSift to subscribe
-		this.send(JSON.stringify({"action":"subscribe", "hash":hash}));
-	}
+__.prototype.unsubscribe = function(hash) {
+    var body = JSON.stringify({'action' : 'unsubscribe', 'hash' : hash});
+    this.client.write(body, 'utf-8');
+    delete this.streams[hash];
+    return Q.resolve();
 };
-
 
 /**
- * Unsubscribe from a hash
- *
- * @param string hash the stream hash
- * 
- * @return void
+ * attempts to subscribe to a specific stream hash
+ * @param hash
+ * @return {promise} - return a stream state object
+ * @private
  */
-DataSift.prototype.unsubscribe = function(hash) {
-	//Check the hash
-	if (!this.checkHash(hash)) {
-		//Send error
-		this.emit('error', new Error('Invalid hash given: ' + hash));
-	} else {
-		//Send json message to DataSift to unsubscribe
-		this.send(JSON.stringify({"action":"unsubscribe", "hash":hash}));
-	}
-};
+__.prototype._subscribeToStream = function(hash, value) {
+    var d = Q.defer();
+    var subscribeMessage = JSON.stringify({'action' : 'subscribe', 'hash' : hash});
+    var self = this;
 
+    //only add listener if it has not been connected
+    if(!this.attachedSubscribeWarningListener) {
+        this.on('warning', function(message) {
+            if(!message.indexOf("The hash",-1)) {
+                var streamHash = message.split(' ')[2];
+                if(self.streams.hasOwnProperty(streamHash)) {
+                    self.streams[streamHash].deferred.reject(message);
+                    delete self.streams[streamHash];
+                }
+            }
+        });
+        this.attachedSubscribeWarningListener = true;
+    }
+
+    if(this.streams.hasOwnProperty(hash)) { //already waiting or subscribed
+        return this.streams[hash].deferred.promise;
+    }
+
+    if(value === undefined) {
+        value = {};
+    }
+    this.streams[hash] = value;
+    this.streams[hash].deferred = d;
+    this.streams[hash].state = 'pending';
+    this.streams[hash].hash = hash;
+
+    this.client.write(subscribeMessage,'utf-8');
+
+    Q.delay(__.SUBSCRIBE_WAIT).then(
+        function() {
+            self.streams[hash].state = 'subscribed';
+            //d.resolve(hash);
+            d.resolve(self.streams[hash]);
+        });
+
+    return this.streams[hash].deferred.promise;
+};
 
 /**
- * Send data to DataSift
- *
- * @param string message the message
- * 
- * @return void
+ * starts the connect
+ * @return {promise}
+ * @private
  */
-DataSift.prototype.send = function(message) {
-	if (this.request != null) {
-		this.request.write(message, 'utf8');
-	} else {
-		this.emit('error', new Error('You cannot send actions without being connected to DataSift'));
-	}
-};
+__.prototype._start = function() {
+    var self = this;
+    if(!this.attachedListeners){
+        this.client.on('data', function(chunk, statusCode) {
+            self._onData(chunk, statusCode);
+        });
 
+        this.client.on('end', function(statusCode){
+            self.emit('debug','end event received with status code ' + statusCode);
+            self._onEnd(statusCode);
+        });
+
+        this.client.on('recovered', function(reason) {
+            self.emit('debug', 'recovered from ' + reason);
+            if(reason !== 'server end') {//skip server ends because we do not want to double subscribe.
+                self._resubscribe();
+            }
+        });
+        this.attachedListeners = true;
+    }
+
+    return this.client.start();
+};
 
 /**
- * Process received data
- *
- * @param Object the json object
- * 
- * @return void
+ * sends subscribe messages to datasift based on streams already subscribed to by this instance
+ * @private
  */
-DataSift.prototype.receivedData = function(json) {
-	//Check for errors
-	if (json.status == "failure") {
-		if (this.convertNextError) {
-			this.emit('success', json.message);
-			this.convertNextError = false;
-		} else {
-			this.errorCallback(new Error(json.message));
-			this.disconnect(true);
-		}
-	
-	//Check for warnings
-	} else if (json.status == "warning") {
-		this.emit('warning', json.message, json);
-	
-	//Check for successes
-	} else if (json.status == "success") {
-		this.emit('success', json.message, json);
-	
-	//Check for deletes
-	} else if (json.data !== undefined && json.data.deleted === true) {
-		this.emit('delete', json);
-	
-	//Check for ticks
-	} else if (json.tick !== undefined) {
-		this.emit('tick', json);
-		
-	//Normal interaction
-	} else {
-		this.emit('interaction', json);
-	
-	}
-	
+__.prototype._resubscribe = function(){
+    var self = this;
+    Object.keys(this.streams).forEach(function(key){ //key = datasift hash
+        delete self.streams[key];
+        self._subscribeToStream(key).then(
+            function(){
+                self.emit('debug', 'reconnected to stream hash ' + key);
+            }, function(err) {
+                self.emit('debug', 'failed to reconnect to stream hash ' + key + " with error: " + err);
+            }
+        );
+    });
 };
-
 
 /**
- * Subscribe to a hash
- *
- * @param string hash the stream hash
- * 
- * @return void
+ * shuts down the existing datasift stream
+ * @return {promise}
  */
-DataSift.prototype.checkHash = function(hash) {
-	try {hash = /([a-f0-9]{32})/i.exec(hash)[1];} catch(e) {}
-	if (hash == null) {
-		return false;
-	} else {
-		return true;
-	}
+__.prototype.shutdown = function () {
+    this.attachedListeners = false;
+    this.attachedSubscribeWarningListener = false;
+    this.streams = {};
+    this.client.write(JSON.stringify({'action' : 'stop'}));
+    return this.client.stop();
 };
 
-//Add exports
-module.exports = DataSift;
+/**
+ * onData callback which handles the data stream coming from the datasift streams.
+ * @param chunk
+ * @param statusCode
+ * @private
+ */
+__.prototype._onData = function(chunk, statusCode) {
+    this.responseData += chunk;
+
+    if(chunk.indexOf('\n') >= 0) {
+        var data = this.responseData.split('\n');
+        this.responseData = data.pop();
+        for (var i = 0; i < data.length; i++) {
+            if (data[i] !== undefined) {
+                var eventData;
+                try {
+                    eventData = JSON.parse(data[i]);
+                } catch(e) {
+                    this.emit('warning', 'could not parse into JSON: ' + data[i] + ' with error: ' + e.toString());  //more details
+                    continue;
+                }
+                if (eventData) {
+                    this._handleEvent(eventData);
+                }
+            }
+        }
+    }
+};
+
+/**
+ * on end call back
+ * @param statusCode
+ * @private
+ */
+__.prototype._onEnd = function(statusCode) {
+    //underlying connection is "recovering"
+    this.responseData = '';
+};
+
+/**
+ * processes the data events coming from DataSift
+ * @param eventData
+ * @private
+ */
+__.prototype._handleEvent = function (eventData) {
+    var self = this;
+    if (eventData.status === 'failure') {
+        if(eventData.message !== 'A stop message was received. You will now be disconnected') {
+            this.emit('error', new Error(eventData.message));
+            this.client.recover().then(
+                function() {
+                    self._resubscribe();
+                }
+            );
+        } else { //means shutdown was called.
+            this.client = undefined;
+        }
+    } else if (eventData.status === 'success' || eventData.status === 'warning' ) {
+        this.emit(eventData.status,eventData.message, eventData);
+    } else if (eventData.data !== undefined && eventData.data.deleted === true){
+        this.emit('delete', eventData);
+    } else if (eventData.tick !== undefined) {
+        this.emit('tick', eventData);
+    } else if (eventData.data !== undefined && eventData.data.interaction !== undefined) {
+        clearTimeout(this.interactionTimeout);
+        this.interactionTimeout = setTimeout(function(){
+            self._recycle();
+        }, __.INTERACTION_TIMEOUT);
+        this.emit('interaction', eventData);
+    } else {
+        this.emit('unknownEvent', eventData);
+    }
+};
+
+/**
+ * recycles the connection.  used when the driver is in an unrecoverable state.  a new underlying socket will be assigned.
+ * @return {promise}
+ * @private
+ */
+__.prototype._recycle = function(){
+    var self = this;
+    this.emit('debug', 'recycling connection');
+
+    return this.client.stop().then(
+        function() {
+            return self.client.recover();
+    }).then(
+        function() {
+            return self._resubscribe();
+        }
+    ).fail(
+        function(err) {
+            self.emit('error', 'failed to reconnect: ' + err);
+            return Q.reject(err);
+        }
+    );
+};
+
+/**
+ * validates the format of the hash
+ * required to be a 32 character hex string
+ * @param hash
+ * @return {Boolean}
+ * @private
+ */
+__.prototype._validateHash = function (hash) {
+    return /^[a-f0-9]{32}$/i.test(hash);
+};
+
+/**
+ * takes the difference between two hashes {hash1} - {hash2} = {resulting set}
+ * @param hash1
+ * @param hash2
+ * @return {Object}
+ * @private
+ */
+__.prototype._hashDifference = function(hash1, hash2) {
+    hash1 = hash1 || {};
+    hash2 = hash2 || {};
+
+    var difference = {};
+    Object.keys(hash1).forEach( function(key) {
+        if(!hash2.hasOwnProperty(key)) {
+            difference[key] = hash1[key];
+        }
+    });
+    return difference;
+};
+
+module.exports = __;
