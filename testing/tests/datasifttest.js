@@ -38,6 +38,44 @@ exports['create'] = {
     }
 }
 
+exports['connect'] = {
+    'success' : function(test) {
+        var ds = DataSift.create('login','apiKey');
+
+        ds._start = function() {
+            test.ok(true);
+            return Q.resolve();
+        };
+
+        test.expect(1);
+
+        ds.connect().then(
+            function() {
+                test.done();
+            }
+        ).done();
+    },
+    'will reject failed connection' : function(test) {
+        var ds = DataSift.create('login','apiKey');
+
+        ds._start = function() {
+            test.ok(true);
+            return Q.reject();
+        };
+
+        test.expect(1);
+
+        ds.connect().then(
+            function() {
+                test.ok(false);
+                test.done();
+            }, function(err) {
+                test.done();
+            }
+        ).done();
+    }
+
+};
 exports['subscribe'] = {
     'success' : function(test) {
         var ds = DataSift.create('login','apiKey');

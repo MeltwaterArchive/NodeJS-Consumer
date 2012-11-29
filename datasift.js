@@ -58,6 +58,9 @@ __.create = function(login, apiKey){
 
 __.prototype = Object.create(EventEmitter.prototype);
 
+__.prototype.connect = function() {
+    return this._start();
+};
 /**
  * subscribes to multiple streams.
  * @param hashes - stream hashes provided by datasift.  either a string of single hash or an object keyed on the datasift hash
