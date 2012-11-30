@@ -1,6 +1,6 @@
 # gh-pages
 
-All files in the gh-pages branch are auto-generated. They are used to auto-build the DataSift NodeJS-Consumer Library [documentation](https://github.com/datasift/NodeJS-Consumer "DataSift NodeJS-Consumer Library Documentation").
+All files in the gh-pages branch are auto-generated. They are used to auto-build the DataSift NodeJS-Consumer Library [documentation](http://datasift.github.com/NodeJS-Consumer/ "DataSift NodeJS-Consumer Library Documentation").
 
 For more information about DataSift APIs, visit our [developer documentation site](http://dev.datasift.com/ "DataSift Developer site").
 
