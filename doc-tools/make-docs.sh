@@ -1,17 +1,33 @@
-#! /bin/sh
+#!/bin/sh -v
+if [ -z "$1" ]; then
+    echo 'You must run this script with branch name as its argument, e.g.'
+    echo 'sh ./make-docs.sh master'
+    exit
+fi
+echo 'working on branch '$1
+echo 'installing tools'
+sudo apt-get install git
+sudo apt-get install nodejs
+sudo apt-get install npm
+sudo apt-get install python-setuptools
+sudo npm install -g docco
+sudo npm install -g coffee-script
+sudo easy_install Pygments
+echo 'making temporary directory'
+mkdir tmp
+cd tmp
+echo 'cloning repos'
+git clone https://github.com/datasift/NodeJS-Consumer code
+git clone https://github.com/datasift/NodeJS-Consumer gh-pages
+cd code
+git checkout $1
+cd ..
+cd gh-pages
+git checkout gh-pages
 
-which docco >/dev/null 2>&1 || { echo >&2 \
-"This script requires additional software to run. If you run Ubuntu, please make sure that you install the following packages:\n" \
-"\n" \
-"sudo apt-get install nodejs\n" \
-"sudo apt-get install npm\n" \
-"sudo apt-get install python-setuptools\n" \
-"sudo npm install -g docco\n" \
-"sudo npm install -g coffee-script\n" \
-"sudo easy_install Pygments\n" \
-; exit 1; }
+cd doc-tools
 
-docco ../../master/*.js
+docco ../../code/*.js
 
 cd docs
 fl=`ls *html`
@@ -33,3 +49,11 @@ mv docs/index_new.html docs/index.html
 
 cp docs/* ../
 rm -rf docs index.js index-body.js
+cd ..
+
+git add *.html
+git add *.css
+git commit -m 'Updated to reflect the latest changes to '$1
+echo 'You are going to update the gh-pages branch to reflect the latest changes to '$1
+git push origin gh-pages
+echo 'finished'
