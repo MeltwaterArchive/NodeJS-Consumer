@@ -1,11 +1,16 @@
-#!/bin/sh -v
-if [ -z "$1" ]; then
-    echo 'You must run this script with branch name as its argument, e.g.'
-    echo 'sh ./make-docs.sh master'
-    exit
-fi
-echo 'working on branch '$1
-echo 'installing tools'
+#!/bin/bash
+#-v
+
+export BASE_DIR="$( cd "$( dirname $0 )/../../../.." && pwd )/"
+
+source ${BASE_DIR}ms-tools/doc-tools/docathon/sub/make-docs-util-defs.sh
+initialise $*
+
+### node.js-specific parameters
+parameters "nodejs" "NodeJS-Consumer"
+
+### installation of node.js-specific tools
+message "installing tools"
 sudo apt-get install git
 sudo apt-get install nodejs
 sudo apt-get install npm
@@ -13,47 +18,47 @@ sudo apt-get install python-setuptools
 sudo npm install -g docco
 sudo npm install -g coffee-script
 sudo easy_install Pygments
-echo 'making temporary directory'
-mkdir tmp
-cd tmp
-echo 'cloning repos'
-git clone https://github.com/datasift/NodeJS-Consumer code
-git clone https://github.com/datasift/NodeJS-Consumer gh-pages
-cd code
-git checkout $1
-cd ..
-cd gh-pages
-git checkout gh-pages
 
-cd doc-tools
+pre_build
 
-docco ../../code/*.js
+### node.js-specific build steps
 
-cd docs
-fl=`ls *html`
-cd ..
+(
+	message "building documents"
+	cd ${GH_PAGES_DIR}doc-tools ; stop_on_error
+	docco ../../code/*.js ; stop_on_error
 
-for f in $fl
-do 
-	echo '//<a href="'$f'">'$f'</a><br />' >> index-body.js;
-done
+	cd ${GH_PAGES_DIR}doc-tools/docs` ; stop_on_error
+	fl=`ls *html`
+	cd ${GH_PAGES_DIR}doc-tools ; stop_on_error
 
-echo '//<a href="https://github.com/datasift/NodeJS-Consumer/blob/master/LICENSE">LICENSE</a><br />' >> index-body.js
-echo '//<a href="https://github.com/datasift/NodeJS-Consumer/blob/master/README.md">README.md</a><br />' >> index-body.js
-echo ' ' >> index-body.js
+	for f in ${fl}
+	do 
+		echo '//<a href="'${f}'">'${f}'</a><br />' >> index-body.js;
+	done
 
-cat index-header.js index-body.js index-footer.js > index.js
-docco index.js
-cat docs/index.html | sed -e 's/index.js/NodeJS-Consumer/g' > docs/index_new.html
-mv docs/index_new.html docs/index.html
+	echo '//<a href="https://github.com/datasift/NodeJS-Consumer/blob/master/LICENSE">LICENSE</a><br />' >> index-body.js
+	echo '//<a href="https://github.com/datasift/NodeJS-Consumer/blob/master/README.md">README.md</a><br />' >> index-body.js
+	echo ' ' >> index-body.js
 
-cp docs/* ../
-rm -rf docs index.js index-body.js
-cd ..
+	cat index-header.js index-body.js index-footer.js > index.js
+	docco index.js ; stop_on_error
+	cat docs/index.html | sed -e 's/index.js/NodeJS-Consumer/g' > docs/index_new.html
+	mv docs/index_new.html docs/index.html
+) || error "stopped parent"
+(
+	message "copying documents"
+	cd ${GH_PAGES_DIR}doc-tools ; stop_on_error
+	cp docs/* ../ ; stop_on_error
+	rm -rf docs index.js index-body.js ; stop_on_error
+) || error "stopped parent"
 
-git add *.html
-git add *.css
-git commit -m 'Updated to reflect the latest changes to '$1
-echo 'You are going to update the gh-pages branch to reflect the latest changes to '$1
-git push origin gh-pages
-echo 'finished'
+(
+	cd ${GH_PAGES_DIR} ; stop_on_error
+	git add *.html
+	git add *.css
+) || error "stopped parent"
+
+post_build
+
+finalise
