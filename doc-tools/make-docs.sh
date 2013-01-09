@@ -1,9 +1,10 @@
 #!/bin/bash
 #-v
 
-export BASE_DIR="$( cd "$( dirname $0 )/../../../.." && pwd )/"
+export BASE_DIR="`pwd`/"
 
 source ${BASE_DIR}ms-tools/doc-tools/docathon/sub/make-docs-util-defs.sh
+export BASE_DIR="/tmp/$(basename $0).$$.tmp/"
 initialise $*
 
 ### node.js-specific parameters
@@ -28,7 +29,7 @@ pre_build
 	cd ${GH_PAGES_DIR}doc-tools ; stop_on_error
 	docco ../../code/*.js ; stop_on_error
 
-	cd ${GH_PAGES_DIR}doc-tools/docs` ; stop_on_error
+	cd ${GH_PAGES_DIR}doc-tools/docs ; stop_on_error
 	fl=`ls *html`
 	cd ${GH_PAGES_DIR}doc-tools ; stop_on_error
 
