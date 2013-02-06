@@ -14,3 +14,9 @@ It connects to the DataSift streaming API, and emits all data received. It can a
 
 ## Use
 - See the example.js script for how to use the library
+
+## Changelog
+
+### 0.3.0 - 6th Feb 2013
+- Disconnect method destroys socket
+- Added a timer to disconnect if there has been no activity on the socket for 35 seconds
