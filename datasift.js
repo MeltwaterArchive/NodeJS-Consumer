@@ -56,6 +56,9 @@ function DataSift(username, apiKey, host, port) {
 	
 	//Connect timeout
 	this.connectTimeout = null;
+
+	//Data received timeout
+	this.dataTimeout = null;
 	
 	//Convert the next error to a success
 	this.convertNextError = false;
@@ -77,6 +80,9 @@ function DataSift(username, apiKey, host, port) {
 	
 	//Data callback
 	this.dataCallback = function(chunk) {
+
+		// We have data to send, so let's reset the timer
+		self.resetDataReceivedTimer();
 		
 		//Convert to utf8 from buffer
 		chunk = chunk.toString('utf8');
@@ -118,6 +124,9 @@ function DataSift(username, apiKey, host, port) {
 		//Emit a connected event
 		self.emit('connect');
 
+		//Set our data receiving timer going
+		self.resetDataReceivedTimer();
+
 		//Disconnection
 		response.connection.on('end', self.disconnectCallback);
 		
@@ -127,6 +136,25 @@ function DataSift(username, apiKey, host, port) {
 	
 }
 util.inherits(DataSift, events.EventEmitter);
+
+
+/**
+ * Reset the data received timer
+ *
+ * @return void
+ */
+DataSift.prototype.resetDataReceivedTimer = function() {
+
+	var disconnectTimeout = 35000;
+
+	if (this.dataTimeout != null) {
+		clearTimeout(this.dataTimeout);
+	}
+
+	this.dataTimeout = setTimeout(function(){
+		this.disconnect(true);
+	}.bind(this), disconnectTimeout);
+}
 
 
 /**
@@ -208,6 +236,11 @@ DataSift.prototype.disconnect = function(forced) {
 			this.response.connection.removeListener('end', this.disconnectCallback);
 			this.response.removeListener('data', this.dataCallback);
 		}
+
+		//Try and actually close the connection
+		try {
+			this.response.destroy();
+		} catch (e){}
 
 		//Clear the request and response objects
 		this.request = null;
