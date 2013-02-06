@@ -237,6 +237,11 @@ DataSift.prototype.disconnect = function(forced) {
 			this.response.removeListener('data', this.dataCallback);
 		}
 
+		//Try and actually close the connection
+		try {
+			this.response.destroy();
+		} catch (e){}
+
 		//Clear the request and response objects
 		this.request = null;
 		this.response = null;
