@@ -145,7 +145,7 @@ util.inherits(DataSift, events.EventEmitter);
  */
 DataSift.prototype.resetDataReceivedTimer = function() {
 
-	var disconnectTimeout = 35000;
+	var disconnectTimeout = 65000;
 
 	if (this.dataTimeout != null) {
 		clearTimeout(this.dataTimeout);

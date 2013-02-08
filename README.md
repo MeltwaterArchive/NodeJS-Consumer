@@ -17,6 +17,9 @@ It connects to the DataSift streaming API, and emits all data received. It can a
 
 ## Changelog
 
+### 0.3.1 - 8th Feb 2013
+- Increase socket activity check timeout to 65 seconds to ensure we don't get disconnected early
+
 ### 0.3.0 - 6th Feb 2013
 - Disconnect method destroys socket
 - Added a timer to disconnect if there has been no activity on the socket for 35 seconds
